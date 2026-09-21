@@ -1,0 +1,10 @@
+{
+  "description": "Enhance English speaking skills with assessments, practice activities, and tutor feedback, tracking progress for students and educators.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

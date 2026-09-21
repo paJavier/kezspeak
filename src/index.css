@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=DM+Mono:wght@500&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Poppins', system-ui, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --color-kez-blue: #1E40AF;
+  --color-kez-blue-light: #EFF6FF;
+  --color-kez-yellow: #FACC15;
+  --color-kez-yellow-light: #FEF9C3;
+  --color-kez-dark: #0F172A;
+}
+
+:root { font-family: 'Poppins', system-ui, sans-serif; color: #0F172A; background: #fff; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+::selection { background: #FACC15; color: #0F172A; }
