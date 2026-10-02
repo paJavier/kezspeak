@@ -1,20 +1,48 @@
-import { FormEvent, createContext, useContext, useEffect, useState } from "react"
+import { type ComponentType, FormEvent, createContext, useContext, useEffect, useState } from "react"
+import { type User as AuthUser } from "@supabase/supabase-js"
+import {
+  AlertCircle,
+  BarChart3,
+  Bell,
+  BookOpen,
+  CheckCircle2,
+  ClipboardCheck,
+  Headphones,
+  LayoutDashboard,
+  Lightbulb,
+  LockKeyhole,
+  LogOut,
+  MessageCircle,
+  MessageSquare,
+  Settings,
+  Target,
+  TrendingUp,
+  User,
+  Users,
+} from "lucide-react"
 import { supabase, type Profile } from "./lib/supabase"
 
 type View = "landing" | "login" | "signup" | "student" | "tutor" | "admin"
 type AuthState = "loading" | "authenticated" | "unauthenticated"
 
 type AuthContextType = {
+  user: AuthUser | null
   profile: Profile | null
+  role: Profile["role"] | null
+  loading: boolean
   signOut: () => Promise<void>
 }
 const AuthContext = createContext<AuthContextType>({
+  user: null,
   profile: null,
+  role: null,
+  loading: true,
   signOut: async () => {},
 })
 const useAuth = () => useContext(AuthContext)
 
-type IconProps = { className?: string size?: number }
+type IconProps = { className?: string; size?: number }
+type IconComponent = ComponentType<IconProps>
 
 const Mic = ({ className = "", size = 24 }: IconProps) => (
   <svg
@@ -106,7 +134,7 @@ function NoProfileScreen({ onSignOut }: { onSignOut: () => void }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-kez-blue-light px-6 text-center">
       <div className="grid size-16 place-items-center rounded-2xl bg-red-100 text-red-500">
-        <span className="text-2xl">⚠️</span>
+        <AlertCircle size={28} aria-hidden="true" />
       </div>
       <div>
         <p className="text-lg font-extrabold text-kez-dark">
@@ -199,12 +227,12 @@ function HeroVideo() {
   )
 }
 
-const journeys = [
-  ["01", "🎤", "Assess", "Discover your current speaking proficiency."],
-  ["02", "🗣️", "Practice", "Complete engaging English speaking activities."],
-  ["03", "🌱", "Improve", "Build fluency, vocabulary, and confidence."],
-  ["04", "🎯", "Reassess", "Complete your post-assessment."],
-  ["05", "📈", "See Your Growth", "Compare results and measure improvement."],
+const journeys: [string, IconComponent, string, string][] = [
+  ["01", Mic, "Assess", "Discover your current speaking proficiency."],
+  ["02", MessageCircle, "Practice", "Complete engaging English speaking activities."],
+  ["03", TrendingUp, "Improve", "Build fluency, vocabulary, and confidence."],
+  ["04", Target, "Reassess", "Complete your post-assessment."],
+  ["05", BarChart3, "See Your Growth", "Compare results and measure improvement."],
 ]
 
 const features = [
@@ -236,21 +264,9 @@ const features = [
 
 function FeatureGlyph({ type }: { type: string }) {
   if (type === "mic") return <Mic size={28} />
-  if (type === "chat") return <span className="text-3xl leading-none">💬</span>
-  if (type === "notes") return <span className="text-3xl leading-none">✦</span>
-  return (
-    <svg
-      width="30"
-      height="30"
-      viewBox="0 0 30 30"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-    >
-      <path d="M5 24V16M15 24V7M25 24v-12" />
-    </svg>
-  )
+  if (type === "chat") return <MessageSquare size={28} />
+  if (type === "notes") return <ClipboardCheck size={28} />
+  return <BarChart3 size={30} />
 }
 
 function Landing({
@@ -330,15 +346,9 @@ function Landing({
             </div>
             <div className="mt-12 flex items-center gap-4">
               <div className="flex -space-x-3">
-                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-pink-200 text-xs">
-                  😊
-                </span>
-                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-sky-200 text-xs">
-                  👋
-                </span>
-                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-orange-200 text-xs">
-                  🧑🏽
-                </span>
+                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-pink-200 text-kez-blue"><User size={16} /></span>
+                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-sky-200 text-kez-blue"><Users size={16} /></span>
+                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-orange-200 text-kez-blue"><MessageCircle size={16} /></span>
               </div>
               <p className="text-sm font-medium text-slate-500">
                 <b className="text-kez-dark">2,000+ learners</b> are finding
@@ -364,7 +374,7 @@ function Landing({
             </div>
             <div className="relative grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <div className="absolute left-[9%] right-[9%] top-11 hidden h-px bg-blue-200 lg:block" />
-              {journeys.map(([number, emoji, title, description], index) => (
+              {journeys.map(([number, JourneyIcon, title, description], index) => (
                 <article
                   key={title}
                   className="relative rounded-2xl border border-blue-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
@@ -373,8 +383,8 @@ function Landing({
                     <span className="font-mono text-xs font-bold text-kez-blue">
                       {number}
                     </span>
-                    <span className="grid size-11 place-items-center rounded-xl bg-kez-yellow-light text-xl">
-                      {emoji}
+                    <span className="grid size-11 place-items-center rounded-xl bg-kez-yellow-light text-kez-blue">
+                      <JourneyIcon size={21} />
                     </span>
                   </div>
                   <h3 className="font-bold text-kez-dark">{title}</h3>
@@ -464,8 +474,7 @@ function Landing({
                 <Mic size={25} />
               </span>
               <h2 className="text-4xl font-extrabold tracking-[-.045em] sm:text-5xl">
-                Ready to find your voice?{" "}
-                <span className="inline-block">🎤</span>
+                Ready to find your voice?
               </h2>
               <p className="mt-5 max-w-[500px] text-lg leading-8 text-blue-100">
                 Start your English speaking journey and discover what you can
@@ -644,7 +653,7 @@ function Login({
           <div className="w-full">
             <div className="mb-8">
               <h2 className="text-4xl font-extrabold tracking-[-.045em] text-kez-dark">
-                Welcome back! <span>👋</span>
+                Welcome back!
               </h2>
               <p className="mt-3 text-slate-500">
                 Log in to continue your speaking journey.
@@ -861,7 +870,7 @@ function Signup({
               <>
                 <div className="mb-8">
                   <h1 className="text-4xl font-extrabold tracking-[-.045em] text-kez-dark">
-                    Create your account <span>✨</span>
+                    Create your account
                   </h1>
                   <p className="mt-3 text-slate-500">
                     A few details and you’ll be ready to speak.
@@ -961,14 +970,14 @@ function Signup({
   )
 }
 
-const studentNav = [
-  ["dashboard", "⌂", "Dashboard"],
-  ["assessment", "🎤", "My Assessment"],
-  ["activities", "🗣", "Speaking Activities"],
-  ["feedback", "💬", "Feedback"],
-  ["progress", "↗", "My Progress"],
-  ["results", "▦", "Results"],
-  ["profile", "◉", "Profile"],
+const studentNav: [string, IconComponent, string][] = [
+  ["dashboard", LayoutDashboard, "Dashboard"],
+  ["assessment", ClipboardCheck, "My Assessment"],
+  ["activities", MessageCircle, "Speaking Activities"],
+  ["feedback", MessageSquare, "Feedback"],
+  ["progress", TrendingUp, "My Progress"],
+  ["results", BarChart3, "Results"],
+  ["profile", User, "Profile"],
 ]
 const skillScores = [
   ["Pronunciation", 70, "bg-sky-400"],
@@ -987,7 +996,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
   const [done, setDone] = useState(false)
   const [filter, setFilter] = useState("All")
   const titles: Record<string, string> = {
-    dashboard: `Good morning, ${firstName}! 👋`,
+    dashboard: `Good morning, ${firstName}!`,
     assessment: "My Speaking Assessment",
     activities: "Speaking Activities",
     activity: "Describe Your Weekend",
@@ -1024,7 +1033,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
           My space
         </p>
         <nav className="mt-3 space-y-1">
-          {studentNav.map(([id, icon, label]) => (
+          {studentNav.map(([id, Icon, label]) => (
             <button
               key={id}
               onClick={() => setPage(id)}
@@ -1034,20 +1043,20 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                   : "text-white/60 hover:bg-white/10 hover:text-white"
               }`}
             >
-              <span className="text-lg">{icon}</span>
+              <Icon size={19} aria-hidden="true" />
               {label}
             </button>
           ))}
         </nav>
         <div className="mt-auto border-t border-white/10 pt-4">
           <button className="flex w-full gap-3 rounded-xl px-3 py-3 text-sm text-white/60">
-            ⚙ Settings
+            <Settings size={18} aria-hidden="true" /> Settings
           </button>
           <button
             onClick={signOut}
             className="flex w-full gap-3 rounded-xl px-3 py-3 text-sm text-white/60"
           >
-            ↪ Log Out
+            <LogOut size={18} aria-hidden="true" /> Log Out
           </button>
           <div className="mt-3 flex items-center gap-3 rounded-xl bg-white/8 p-3">
             <span className="grid size-9 place-items-center rounded-full bg-kez-yellow font-bold text-kez-dark">
@@ -1072,7 +1081,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
           </div>
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-full bg-kez-blue-light">
-              🔔
+              <Bell size={18} aria-label="Notifications" />
             </span>
             <span className="grid size-10 place-items-center rounded-full bg-kez-yellow font-bold">
               {avatarLetter}
@@ -1101,7 +1110,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                 </div>
                 <div className="mt-8 grid gap-3 sm:grid-cols-4">
                   {[
-                    ["✓", "Pre-Assessment", "Completed"],
+                    ["01", "Pre-Assessment", "Completed"],
                     ["02", "Practice", "In progress"],
                     ["03", "Post-Assessment", "Up next"],
                     ["04", "Improvement", "Unlocks soon"],
@@ -1130,7 +1139,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                         Pre-Assessment
                       </h2>
                       <p className="mt-3 text-sm font-bold text-green-600">
-                        ✓ Completed
+                        <CheckCircle2 className="inline-block" size={16} aria-hidden="true" /> Completed
                       </p>
                     </div>
                     <p className="text-3xl font-extrabold text-kez-blue">
@@ -1141,7 +1150,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                     onClick={() => setPage("results")}
                     className="mt-7 text-sm font-bold text-kez-blue"
                   >
-                    View Results →
+                    <span className="inline-flex items-center gap-1">View Results <Arrow size={15} /></span>
                   </button>
                 </section>
                 <section className="rounded-3xl bg-kez-yellow-light p-7">
@@ -1158,7 +1167,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                     onClick={() => setPage("activity")}
                     className="mt-6 rounded-xl bg-kez-dark px-4 py-3 text-sm font-bold text-white"
                   >
-                    🎤 Start Practice
+                    <span className="inline-flex items-center gap-2"><Mic size={16} />Start Practice</span>
                   </button>
                 </section>
               </div>
@@ -1178,7 +1187,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                 <section className="rounded-3xl bg-white p-7 shadow-sm">
                   <div className="flex items-center gap-3">
                     <span className="grid size-10 place-items-center rounded-full bg-pink-100">
-                      👩🏽
+                      <User size={19} aria-label="Tutor" />
                     </span>
                     <div>
                       <p className="font-extrabold">Feedback from Maria</p>
@@ -1195,7 +1204,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                     onClick={() => setPage("feedback")}
                     className="mt-5 text-sm font-bold text-kez-blue"
                   >
-                    View Feedback →
+                    <span className="inline-flex items-center gap-1">View Feedback <Arrow size={15} /></span>
                   </button>
                 </section>
               </div>
@@ -1208,10 +1217,10 @@ function StudentApp({ onExit }: { onExit: () => void }) {
               </p>
               <div className="mt-8 space-y-3">
                 {[
-                  ["✓", "Pre-Assessment", "Completed"],
+                  ["01", "Pre-Assessment", "Completed"],
                   ["02", "Speaking Activities", "In Progress"],
-                  ["🔒", "Post-Assessment", "Not Available Yet"],
-                  ["🔒", "Final Comparison", "Locked"],
+                  ["03", "Post-Assessment", "Not Available Yet"],
+                  ["04", "Final Comparison", "Locked"],
                 ].map(([n, name, status], i) => (
                   <div
                     key={name}
@@ -1226,7 +1235,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                             : "bg-slate-100"
                       }`}
                     >
-                      {n}
+                      {i > 1 ? <LockKeyhole size={17} aria-label="Locked" /> : n}
                     </span>
                     <div className="flex-1">
                       <b>{name}</b>
@@ -1244,8 +1253,9 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                 ))}
               </div>
               <p className="mt-7 rounded-2xl bg-kez-yellow-light p-5 text-sm text-amber-900">
-                💡 Complete your speaking activities before taking the
+                <span className="inline-flex items-start gap-2"><Lightbulb className="mt-0.5 shrink-0" size={18} />Complete your speaking activities before taking the
                 post-assessment.
+                </span>
               </p>
             </section>
           )}
@@ -1295,8 +1305,8 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                     key={name}
                     className="rounded-3xl bg-white p-5 shadow-sm"
                   >
-                    <span className="grid size-12 place-items-center rounded-2xl bg-kez-blue-light text-2xl">
-                      {["🎙️", "💭", "👄", "📚"][i]}
+                    <span className="grid size-12 place-items-center rounded-2xl bg-kez-blue-light text-kez-blue">
+                      {i === 0 ? <Mic size={23} /> : i === 1 ? <MessageCircle size={23} /> : i === 2 ? <MessageSquare size={23} /> : <BookOpen size={23} />}
                     </span>
                     <h2 className="mt-7 font-extrabold">{name}</h2>
                     <p className="mt-4 text-xs leading-6 text-slate-500">
@@ -1366,7 +1376,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                 ) : done ? (
                   <>
                     <button className="mt-7 rounded-xl bg-kez-blue-light px-5 py-3 text-sm font-bold text-kez-blue">
-                      ▶ Play Recording
+                      <span className="inline-flex items-center gap-2"><Play size={14} />Play Recording</span>
                     </button>
                     <button
                       onClick={() => setPage("activities")}
@@ -1380,11 +1390,11 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                     onClick={() => setRecording(true)}
                     className="mt-7 rounded-xl bg-kez-blue px-6 py-4 text-sm font-bold text-white"
                   >
-                    🎤 Start Recording
+                      <span className="inline-flex items-center gap-2"><Mic size={16} />Start Recording</span>
                   </button>
                 )}
                 <p className="mt-7 text-sm font-semibold text-slate-500">
-                  Speak naturally. Take your time. You’ve got this! 🌟
+                  Speak naturally. Take your time. You’ve got this!
                 </p>
               </div>
             </section>
@@ -1551,16 +1561,16 @@ function TutorApp({ onExit }: { onExit: () => void }) {
   const [page, setPage] = useState("dashboard")
   const [reviewed, setReviewed] = useState(false)
   const [tab, setTab] = useState("Pre-Assessment")
-  const nav = [
-    ["dashboard", "⌂", "Dashboard"],
-    ["learners", "👥", "Learners"],
-    ["submissions", "🎤", "Assessments"],
-    ["activities", "🗣", "Speaking Activities"],
-    ["review", "🎧", "Submissions"],
-    ["feedback", "💬", "Feedback"],
-    ["progress", "↗", "Progress"],
-    ["reports", "▦", "Reports"],
-    ["profile", "◉", "Profile"],
+  const nav: [string, IconComponent, string][] = [
+    ["dashboard", LayoutDashboard, "Dashboard"],
+    ["learners", Users, "Learners"],
+    ["submissions", ClipboardCheck, "Assessments"],
+    ["activities", MessageCircle, "Speaking Activities"],
+    ["review", Headphones, "Submissions"],
+    ["feedback", MessageSquare, "Feedback"],
+    ["progress", TrendingUp, "Progress"],
+    ["reports", BarChart3, "Reports"],
+    ["profile", User, "Profile"],
   ]
   const scores = [
     ["Pronunciation", 70, 84],
@@ -1569,8 +1579,14 @@ function TutorApp({ onExit }: { onExit: () => void }) {
     ["Vocabulary", 78, 89],
     ["Confidence", 68, 87],
   ]
+  const dashboardStats: [IconComponent, string, string, string][] = [
+    [Users, "Active Learners", "48", "bg-kez-blue-light"],
+    [Headphones, "Pending Evaluations", "12", "bg-kez-yellow-light"],
+    [CheckCircle2, "Assessments Completed", "96", "bg-green-50"],
+    [TrendingUp, "Average Improvement", "+13 points", "bg-pink-50"],
+  ]
   const titles: Record<string, string> = {
-    dashboard: `Good morning, ${firstName}! 👋`,
+    dashboard: `Good morning, ${firstName}!`,
     learners: "My Learners",
     submissions: "Assessment Submissions",
     review: "Speaking Assessment Review",
@@ -1595,7 +1611,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
           Tutor workspace
         </p>
         <nav className="mt-3 space-y-1">
-          {nav.map(([id, icon, label]) => (
+          {nav.map(([id, Icon, label]) => (
             <button
               onClick={() => setPage(id)}
               key={id}
@@ -1605,7 +1621,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
                   : "text-white/60 hover:bg-white/10 hover:text-white"
               }`}
             >
-              <span className="text-lg">{icon}</span>
+              <Icon size={19} aria-hidden="true" />
               {label}
               {id === "review" && (
                 <b className="ml-auto rounded-full bg-kez-yellow px-2 py-0.5 text-[10px] text-kez-dark">
@@ -1617,13 +1633,13 @@ function TutorApp({ onExit }: { onExit: () => void }) {
         </nav>
         <div className="mt-auto border-t border-white/10 pt-4">
           <button className="flex w-full gap-3 px-3 py-3 text-sm text-white/60">
-            ⚙ Settings
+            <Settings size={18} aria-hidden="true" /> Settings
           </button>
           <button
             onClick={signOut}
             className="flex w-full gap-3 px-3 py-3 text-sm text-white/60"
           >
-            ↪ Log Out
+            <LogOut size={18} aria-hidden="true" /> Log Out
           </button>
           <div className="mt-3 flex items-center gap-3 rounded-xl bg-white/8 p-3">
             <span className="grid size-9 place-items-center rounded-full bg-kez-yellow font-bold text-kez-dark">
@@ -1648,7 +1664,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
           </div>
           <div className="flex gap-3">
             <span className="grid size-10 place-items-center rounded-full bg-kez-blue-light">
-              🔔
+              <Bell size={18} aria-label="Notifications" />
             </span>
             <span className="grid size-10 place-items-center rounded-full bg-kez-yellow font-bold text-kez-dark">
               {avatarLetter}
@@ -1662,14 +1678,9 @@ function TutorApp({ onExit }: { onExit: () => void }) {
                 Here’s how your learners are progressing.
               </p>
               <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ["👥", "Active Learners", "48", "bg-kez-blue-light"],
-                  ["🎧", "Pending Evaluations", "12", "bg-kez-yellow-light"],
-                  ["✓", "Assessments Completed", "96", "bg-green-50"],
-                  ["↗", "Average Improvement", "+13 points", "bg-pink-50"],
-                ].map(([icon, label, value, bg]) => (
+                {dashboardStats.map(([Icon, label, value, bg]) => (
                   <div key={label} className={`rounded-3xl p-6 ${bg}`}>
-                    <span className="text-2xl">{icon}</span>
+                    <Icon size={25} className="text-kez-blue" aria-hidden="true" />
                     <p className="mt-6 text-sm font-semibold text-slate-600">
                       {label}
                     </p>
@@ -1691,7 +1702,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
                     onClick={() => setPage("review")}
                     className="text-sm font-bold text-kez-blue"
                   >
-                    View all →
+                    <span className="inline-flex items-center gap-1">View all <Arrow size={15} /></span>
                   </button>
                 </div>
                 <div className="mt-6 grid gap-3">
@@ -1952,7 +1963,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
                     </div>
                     {reviewed && (
                       <p className="mt-4 rounded-xl bg-green-50 p-3 text-xs font-bold text-green-700">
-                        ✓ Evaluation submitted! Feedback is now available to the
+                        <CheckCircle2 className="mr-1 inline-block" size={15} aria-hidden="true" />Evaluation submitted! Feedback is now available to the
                         learner.
                       </p>
                     )}
@@ -2003,7 +2014,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
                           {post}
                         </span>
                         <span className="font-bold text-green-600">
-                          +{post - pre}
+                              +{Number(post) - Number(pre)}
                         </span>
                       </div>
                     ))}
@@ -2014,7 +2025,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
                     GREATEST IMPROVEMENT
                   </p>
                   <h2 className="mt-4 text-2xl font-extrabold">
-                    🎤 Confidence
+                    <span className="inline-flex items-center gap-2"><Mic size={21} />Confidence</span>
                   </h2>
                   <p className="mt-1 text-4xl font-extrabold">
                     +19 <span className="text-lg">points</span>
@@ -2032,7 +2043,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
           )}
           {page === "profile" && (
             <section className="max-w-xl rounded-3xl bg-white p-8 shadow-sm">
-              <span className="text-5xl">👩🏽</span>
+              <span className="grid size-14 place-items-center rounded-full bg-pink-100 text-kez-blue"><User size={27} aria-label="Tutor profile" /></span>
               <h2 className="mt-4 text-2xl font-extrabold">Maria Santos</h2>
               <p className="text-slate-500">Tutor & Speaking Assessor</p>
               <div className="mt-7 rounded-2xl bg-kez-blue-light p-5">
@@ -2053,38 +2064,60 @@ function TutorApp({ onExit }: { onExit: () => void }) {
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>("loading")
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [view, setView] = useState<View>("landing")
   const [noProfile, setNoProfile] = useState(false)
+  const [path, setPath] = useState(() => window.location.pathname)
+
+  const navigate = (nextPath: string, replace = false) => {
+    if (window.location.pathname !== nextPath) window.history[replace ? "replaceState" : "pushState"]({}, "", nextPath)
+    setPath(nextPath)
+  }
 
   const signOut = async () => {
     console.log("[KezSpeak] Signing out")
     await supabase.auth.signOut()
+    setUser(null)
     setProfile(null)
     setAuthState("unauthenticated")
-    setView("landing")
+    setView("login")
     setNoProfile(false)
+    navigate("/login", true)
   }
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("[KezSpeak] Auth event:", event, "user:", session?.user?.id ?? null)
-        if (session?.user) {
+        const { data: { user: authenticatedUser } } = await supabase.auth.getUser()
+        if (!authenticatedUser) {
+          setUser(null)
+          setProfile(null)
+          setAuthState("unauthenticated")
+          setNoProfile(false)
+          return
+        }
+        if (authenticatedUser) {
+          setUser(authenticatedUser)
           const { data, error } = await supabase
             .from("profiles")
             .select("*")
-            .eq("id", session.user.id)
+            .eq("id", authenticatedUser.id)
             .single()
 
           console.log("[KezSpeak] Profile lookup — data:", data, "error:", error?.message ?? null)
 
           if (error && (error.message.includes("relation") || error.message.includes("does not exist"))) {
+            setProfile(null)
+            setAuthState("unauthenticated")
+            setNoProfile(true)
+            return
             console.warn("[KezSpeak] profiles table missing — defaulting to student role")
             const fallbackProfile: Profile = {
-              id: session.user.id,
-              full_name: session.user.user_metadata?.full_name ?? session.user.email ?? "User",
-              email: session.user.email ?? "",
+              id: authenticatedUser!.id,
+              full_name: authenticatedUser!.user_metadata?.full_name ?? authenticatedUser!.email ?? "User",
+              email: authenticatedUser!.email ?? "",
               role: "student",
             }
             setProfile(fallbackProfile)
@@ -2095,19 +2128,26 @@ export default function App() {
           }
 
           if (!data || error) {
-            console.warn("[KezSpeak] No profile found for user:", session.user.id)
+            console.warn("[KezSpeak] No profile found for the authenticated user")
             setAuthState("unauthenticated")
             setNoProfile(true)
             return
           }
 
           const role = data.role as Profile["role"]
+          if (role !== "student" && role !== "tutor" && role !== "admin") {
+            setProfile(null)
+            setAuthState("unauthenticated")
+            setNoProfile(true)
+            return
+          }
           console.log("[KezSpeak] Detected role:", role, "→ redirecting to", role === "tutor" ? "/tutor" : role === "admin" ? "/admin" : "/student")
           setProfile(data as Profile)
           setAuthState("authenticated")
           setNoProfile(false)
           setView(role === "tutor" ? "tutor" : role === "admin" ? "admin" : "student")
         } else {
+          setUser(null)
           setProfile(null)
           setAuthState("unauthenticated")
           setView((prev) =>
@@ -2121,12 +2161,29 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    const onPopState = () => setPath(window.location.pathname)
+    window.addEventListener("popstate", onPopState)
+    return () => window.removeEventListener("popstate", onPopState)
+  }, [])
+
+  useEffect(() => {
+    if (authState === "authenticated" && profile) {
+      const ownPath = `/${profile.role}`
+      if (path !== ownPath) navigate(ownPath, true)
+      return
+    }
+    if (authState === "unauthenticated" && !noProfile && ["/student", "/tutor", "/admin"].includes(path)) {
+      navigate("/login", true)
+    }
+  }, [authState, noProfile, path, profile])
+
   if (authState === "loading") return <LoadingScreen />
 
   if (noProfile)
     return <NoProfileScreen onSignOut={signOut} />
 
-  const authValue = { profile, signOut }
+  const authValue = { user, profile, role: profile?.role ?? null, loading: false, signOut }
 
   if (authState === "authenticated") {
     if (view === "tutor")
@@ -2148,26 +2205,26 @@ export default function App() {
     )
   }
 
-  if (view === "login") {
+  if (path === "/login") {
     return (
       <Login
-        onBack={() => setView("landing")}
-        onSignup={() => setView("signup")}
+        onBack={() => navigate("/")}
+        onSignup={() => navigate("/signup")}
       />
     )
   }
-  if (view === "signup") {
+  if (path === "/signup") {
     return (
       <Signup
-        onBack={() => setView("landing")}
-        onLogin={() => setView("login")}
+        onBack={() => navigate("/")}
+        onLogin={() => navigate("/login")}
       />
     )
   }
   return (
     <Landing
-      onLogin={() => setView("login")}
-      onSignup={() => setView("signup")}
+      onLogin={() => navigate("/login")}
+      onSignup={() => navigate("/signup")}
     />
   )
 }
