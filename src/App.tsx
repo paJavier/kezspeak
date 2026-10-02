@@ -746,6 +746,10 @@ function Signup({
   onLogin: () => void
 }) {
   const [created, setCreated] = useState(false)
+  const [confirmationEmail, setConfirmationEmail] = useState("")
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resendMessage, setResendMessage] = useState("")
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -753,15 +757,24 @@ function Signup({
   const [errorMsg, setErrorMsg] = useState("")
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = window.setTimeout(() => setResendCooldown((seconds) => seconds - 1), 1000)
+    return () => window.clearTimeout(timer)
+  }, [resendCooldown])
+
   async function submit(event: FormEvent) {
     event.preventDefault()
     setErrorMsg("")
 
-    if (!fullName.trim()) {
+    const normalizedName = fullName.trim()
+    const normalizedEmail = email.trim()
+
+    if (!normalizedName) {
       setErrorMsg("Please enter your full name.")
       return
     }
-    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
+    if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
       setErrorMsg("Please enter a valid email address.")
       return
     }
@@ -775,28 +788,86 @@ function Signup({
     }
 
     setLoading(true)
-    console.log("[KezSpeak] Signing up:", email)
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: { full_name: normalizedName },
+          emailRedirectTo: window.location.origin,
+        },
+      })
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } },
-    })
+      console.log("[KezSpeak] Signup response", {
+        userId: data?.user?.id ?? null,
+        email: data?.user?.email ?? null,
+        identitiesCount: data?.user?.identities?.length ?? null,
+        hasSession: !!data?.session,
+        error: error
+          ? { message: error.message, status: error.status, code: error.code }
+          : null,
+      })
 
-    setLoading(false)
+      if (error) {
+        const message = error.message.toLowerCase()
+        setErrorMsg(
+          message.includes("already registered") || message.includes("already exists")
+            ? "An account with this email already exists."
+            : message.includes("password")
+              ? "Password does not meet the required requirements."
+              : "Unable to create your account. Please try again.",
+        )
+        return
+      }
 
-    if (error) {
-      console.log("[KezSpeak] Signup failed:", error.message)
+      if (!data.user) {
+        console.warn("[KezSpeak] Signup returned no user and no error")
+        setErrorMsg("Unable to create your account. Please try again.")
+        return
+      }
+
+      if (data.user.identities?.length === 0) {
+        setErrorMsg("An account with this email may already exist. Try logging in or resetting your password.")
+        return
+      }
+
+      if (!data.session) {
+        setConfirmationEmail(data.user.email ?? normalizedEmail)
+        setCreated(true)
+      }
+    } catch (error) {
+      console.error("[KezSpeak] Signup request failed:", {
+        message: error instanceof Error ? error.message : "Unknown request error",
+      })
       setErrorMsg(
-        error.message.includes("already registered")
-          ? "An account with this email already exists."
-          : "We couldn't create your account. Please try again.",
+        "Unable to reach the account service. Check your connection and try again.",
       )
-      return
+    } finally {
+      setLoading(false)
     }
+  }
 
-    console.log("[KezSpeak] Signup succeeded")
-    setCreated(true)
+  async function resendConfirmation() {
+    if (!confirmationEmail || resendLoading || resendCooldown > 0) return
+    setResendLoading(true)
+    setResendMessage("")
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: confirmationEmail,
+        options: { emailRedirectTo: window.location.origin },
+      })
+      if (error) {
+        setResendMessage("We couldn't send the confirmation email. Please try again later.")
+      } else {
+        setResendMessage("Confirmation email sent.")
+        setResendCooldown(30)
+      }
+    } catch {
+      setResendMessage("We couldn't send the confirmation email. Please try again later.")
+    } finally {
+      setResendLoading(false)
+    }
   }
 
   return (
@@ -856,15 +927,37 @@ function Signup({
                   Account created!
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Check your email to confirm your account, then log in to
-                  start your speaking journey.
+                  We've sent a confirmation link to:
+                </p>
+                <p className="mt-2 break-all text-sm font-bold text-kez-dark">
+                  {confirmationEmail}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Please check your inbox and click the link before logging in.
                 </p>
                 <button
                   onClick={onLogin}
                   className="mt-7 h-13 w-full rounded-xl bg-kez-blue text-sm font-bold text-white shadow-lg shadow-blue-900/15"
                 >
-                  Go to Log In
+                  Back to Login
                 </button>
+                <button
+                  type="button"
+                  onClick={resendConfirmation}
+                  disabled={resendLoading || resendCooldown > 0}
+                  className="mt-4 text-sm font-bold text-kez-blue disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {resendLoading
+                    ? "Sending..."
+                    : resendCooldown > 0
+                      ? `Resend available in ${resendCooldown}s`
+                      : "Resend confirmation email"}
+                </button>
+                {resendMessage && (
+                  <p role="status" className="mt-2 text-sm text-slate-600">
+                    {resendMessage}
+                  </p>
+                )}
               </div>
             ) : (
               <>
@@ -2088,8 +2181,10 @@ export default function App() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log("[KezSpeak] Auth event:", event, "user:", session?.user?.id ?? null)
+        window.setTimeout(() => {
+          void (async () => {
         const { data: { user: authenticatedUser } } = await supabase.auth.getUser()
         if (!authenticatedUser) {
           setUser(null)
@@ -2156,6 +2251,8 @@ export default function App() {
               : prev,
           )
         }
+          })()
+        }, 0)
       },
     )
     return () => subscription.unsubscribe()
