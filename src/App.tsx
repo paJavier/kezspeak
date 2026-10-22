@@ -10,11 +10,11 @@ type AuthContextType = {
 }
 const AuthContext = createContext<AuthContextType>({
   profile: null,
-  signOut: async () => {},
+  signOut: async () => { },
 })
 const useAuth = () => useContext(AuthContext)
 
-type IconProps = { className?: string size?: number }
+type IconProps = { className?: string; size?: number }
 
 const Mic = ({ className = "", size = 24 }: IconProps) => (
   <svg
@@ -168,9 +168,8 @@ function Wave({ light = false }: { light?: boolean }) {
       {levels.map((height, i) => (
         <i
           key={i}
-          className={`block w-1 rounded-full ${
-            light ? "bg-white/70" : "bg-kez-blue"
-          }`}
+          className={`block w-1 rounded-full ${light ? "bg-white/70" : "bg-kez-blue"
+            }`}
           style={{ height: `${height}%`, opacity: i === 8 ? 1 : undefined }}
         />
       ))}
@@ -417,20 +416,18 @@ function Landing({
               {features.map(([number, title, copy, glyph], i) => (
                 <article
                   key={title}
-                  className={`min-h-60 rounded-3xl p-7 ${
-                    i === 0
-                      ? "bg-kez-blue text-white"
-                      : i === 1
-                        ? "bg-kez-yellow-light"
-                        : i === 2
-                          ? "bg-slate-50"
-                          : "bg-kez-blue-light"
-                  }`}
+                  className={`min-h-60 rounded-3xl p-7 ${i === 0
+                    ? "bg-kez-blue text-white"
+                    : i === 1
+                      ? "bg-kez-yellow-light"
+                      : i === 2
+                        ? "bg-slate-50"
+                        : "bg-kez-blue-light"
+                    }`}
                 >
                   <div
-                    className={`mb-10 flex items-start justify-between ${
-                      i === 0 ? "text-kez-yellow" : "text-kez-blue"
-                    }`}
+                    className={`mb-10 flex items-start justify-between ${i === 0 ? "text-kez-yellow" : "text-kez-blue"
+                      }`}
                   >
                     <span className="grid size-12 place-items-center rounded-2xl bg-white/80 shadow-sm">
                       <FeatureGlyph type={glyph} />
@@ -443,9 +440,8 @@ function Landing({
                     {title}
                   </h3>
                   <p
-                    className={`mt-3 text-sm leading-6 ${
-                      i === 0 ? "text-white/70" : "text-slate-600"
-                    }`}
+                    className={`mt-3 text-sm leading-6 ${i === 0 ? "text-white/70" : "text-slate-600"
+                      }`}
                   >
                     {copy}
                   </p>
@@ -526,18 +522,50 @@ function Landing({
 function Login({
   onBack,
   onSignup,
+  banner,
 }: {
   onBack: () => void
   onSignup: () => void
+  banner?: { type: "error" | "info" | "success"; message: string } | null
 }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [errorMsg, setErrorMsg] = useState("")
+  const [infoMsg, setInfoMsg] = useState("")
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [showResend, setShowResend] = useState(false)
+
+  async function resendConfirmation() {
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail || !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+      setErrorMsg("Please enter your email above to resend the confirmation link.")
+      return
+    }
+    setResending(true)
+    setErrorMsg("")
+    setInfoMsg("")
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: trimmedEmail,
+      })
+      if (error) {
+        setErrorMsg(error.message)
+      } else {
+        setInfoMsg("A fresh confirmation link has been sent! Check your inbox.")
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Failed to resend confirmation.")
+    } finally {
+      setResending(false)
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setErrorMsg("")
+    setInfoMsg("")
 
     if (!email.trim()) {
       setErrorMsg("Please enter your email address.")
@@ -566,7 +594,8 @@ function Login({
       setLoading(false)
       const msg = error.message.toLowerCase()
       if (msg.includes("confirm") || msg.includes("not confirmed") || msg.includes("verification")) {
-        setErrorMsg("Please confirm your email address before logging in. Check your inbox for a confirmation link.")
+        setErrorMsg("Please confirm your email address before logging in.")
+        setShowResend(true)
       } else if (msg.includes("invalid") || msg.includes("credentials") || msg.includes("user not found") || msg.includes("wrong")) {
         setErrorMsg("Incorrect email or password.")
       } else if (msg.includes("network") || msg.includes("fetch") || msg.includes("failed to fetch")) {
@@ -650,78 +679,106 @@ function Login({
                 Log in to continue your speaking journey.
               </p>
             </div>
+
+            {banner && (
+              <div
+                className={`mb-6 rounded-2xl p-4 text-xs font-semibold leading-5 ${
+                  banner.type === "error"
+                    ? "border border-amber-200 bg-amber-50 text-amber-900"
+                    : "border border-blue-200 bg-blue-50 text-blue-900"
+                }`}
+              >
+                <p>{banner.message}</p>
+              </div>
+            )}
+
             <form onSubmit={submit} noValidate>
-                <label className="block text-sm font-bold text-kez-dark">
-                  Email Address
-                  <input
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value)
-                      setErrorMsg("")
-                    }}
-                    placeholder="Enter your email address"
-                    autoComplete="email"
-                    className={`mt-2 h-13 w-full rounded-xl border bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100 ${
-                      errorMsg ? "border-red-400" : "border-slate-200"
-                    }`}
-                  />
-                </label>
-                <label className="mt-5 block text-sm font-bold text-kez-dark">
-                  Password
-                  <input
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value)
-                      setErrorMsg("")
-                    }}
-                    type="password"
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    className={`mt-2 h-13 w-full rounded-xl border bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100 ${
-                      errorMsg ? "border-red-400" : "border-slate-200"
-                    }`}
-                  />
-                </label>
-                {errorMsg && (
-                  <p className="mt-2 text-xs font-semibold text-red-600">
-                    {errorMsg}
-                  </p>
-                )}
-                <div className="mt-5 flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-slate-300 text-kez-blue focus:ring-kez-blue"
-                    />
-                    Remember me
-                  </label>
-                  <button
-                    type="button"
-                    className="text-sm font-bold text-kez-blue"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <button
-                  disabled={loading}
-                  className="mt-7 flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-kez-blue text-sm font-bold text-white shadow-lg shadow-blue-900/15 transition hover:bg-blue-800 disabled:opacity-75"
-                >
-                  {loading && (
-                    <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              <label className="block text-sm font-bold text-kez-dark">
+                Email Address
+                <input
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setErrorMsg("")
+                  }}
+                  placeholder="Enter your email address"
+                  autoComplete="email"
+                  className={`mt-2 h-13 w-full rounded-xl border bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100 ${
+                    errorMsg ? "border-red-400" : "border-slate-200"
+                  }`}
+                />
+              </label>
+              <label className="mt-5 block text-sm font-bold text-kez-dark">
+                Password
+                <input
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setErrorMsg("")
+                  }}
+                  type="password"
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  className={`mt-2 h-13 w-full rounded-xl border bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100 ${
+                    errorMsg ? "border-red-400" : "border-slate-200"
+                  }`}
+                />
+              </label>
+              {errorMsg && (
+                <div className="mt-2">
+                  <p className="text-xs font-semibold text-red-600">{errorMsg}</p>
+                  {showResend && (
+                    <button
+                      type="button"
+                      disabled={resending}
+                      onClick={resendConfirmation}
+                      className="mt-1 text-xs font-bold text-kez-blue hover:underline disabled:opacity-50"
+                    >
+                      {resending ? "Sending link..." : "Resend confirmation email"}
+                    </button>
                   )}
-                  {loading ? "Logging in..." : "Log In"}
-                </button>
-                <p className="mt-7 text-center text-sm text-slate-500">
-                  Don’t have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={onSignup}
-                    className="font-bold text-kez-blue"
-                  >
-                    Get started
-                  </button>
+                </div>
+              )}
+              {infoMsg && (
+                <p className="mt-2 text-xs font-semibold text-emerald-600">
+                  {infoMsg}
                 </p>
-              </form>
+              )}
+              <div className="mt-5 flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-slate-300 text-kez-blue focus:ring-kez-blue"
+                  />
+                  Remember me
+                </label>
+                <button
+                  type="button"
+                  className="text-sm font-bold text-kez-blue"
+                >
+                  Forgot password?
+                </button>
+              </div>
+              <button
+                disabled={loading}
+                className="mt-7 flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-kez-blue text-sm font-bold text-white shadow-lg shadow-blue-900/15 transition hover:bg-blue-800 disabled:opacity-75"
+              >
+                {loading && (
+                  <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                )}
+                {loading ? "Logging in..." : "Log In"}
+              </button>
+              <p className="mt-7 text-center text-sm text-slate-500">
+                Don’t have an account?{" "}
+                <button
+                  type="button"
+                  onClick={onSignup}
+                  className="font-bold text-kez-blue"
+                >
+                  Get started
+                </button>
+              </p>
+            </form>
           </div>
         </div>
       </section>
@@ -771,7 +828,10 @@ function Signup({
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { 
+        data: { full_name: fullName },
+        emailRedirectTo: window.location.origin,
+      },
     })
 
     setLoading(false)
@@ -1028,11 +1088,10 @@ function StudentApp({ onExit }: { onExit: () => void }) {
             <button
               key={id}
               onClick={() => setPage(id)}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${
-                page === id || (id === "activities" && page === "activity")
-                  ? "bg-kez-blue text-white"
-                  : "text-white/60 hover:bg-white/10 hover:text-white"
-              }`}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${page === id || (id === "activities" && page === "activity")
+                ? "bg-kez-blue text-white"
+                : "text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
             >
               <span className="text-lg">{icon}</span>
               {label}
@@ -1108,9 +1167,8 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                   ].map(([n, label, status], i) => (
                     <div
                       key={label}
-                      className={`rounded-2xl p-4 ${
-                        i === 1 ? "bg-kez-yellow text-kez-dark" : "bg-white/10"
-                      }`}
+                      className={`rounded-2xl p-4 ${i === 1 ? "bg-kez-yellow text-kez-dark" : "bg-white/10"
+                        }`}
                     >
                       <b className="font-mono text-xs">{n}</b>
                       <p className="mt-4 font-bold">{label}</p>
@@ -1218,13 +1276,12 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                     className="flex items-center gap-5 rounded-2xl bg-white p-5 shadow-sm"
                   >
                     <span
-                      className={`grid size-11 place-items-center rounded-full font-bold ${
-                        i === 0
-                          ? "bg-green-500 text-white"
-                          : i === 1
-                            ? "bg-kez-blue text-white"
-                            : "bg-slate-100"
-                      }`}
+                      className={`grid size-11 place-items-center rounded-full font-bold ${i === 0
+                        ? "bg-green-500 text-white"
+                        : i === 1
+                          ? "bg-kez-blue text-white"
+                          : "bg-slate-100"
+                        }`}
                     >
                       {n}
                     </span>
@@ -1269,11 +1326,10 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                   <button
                     key={x}
                     onClick={() => setFilter(x)}
-                    className={`rounded-full px-4 py-2 text-sm font-bold ${
-                      filter === x
-                        ? "bg-kez-blue text-white"
-                        : "bg-white text-slate-500"
-                    }`}
+                    className={`rounded-full px-4 py-2 text-sm font-bold ${filter === x
+                      ? "bg-kez-blue text-white"
+                      : "bg-white text-slate-500"
+                      }`}
                   >
                     {x}
                   </button>
@@ -1331,11 +1387,10 @@ function StudentApp({ onExit }: { onExit: () => void }) {
                   60 seconds
                 </span>
                 <div
-                  className={`mx-auto mt-8 grid size-40 place-items-center rounded-full ${
-                    recording
-                      ? "bg-red-50 text-red-500 ring-8 ring-red-100"
-                      : "bg-kez-blue text-kez-yellow"
-                  }`}
+                  className={`mx-auto mt-8 grid size-40 place-items-center rounded-full ${recording
+                    ? "bg-red-50 text-red-500 ring-8 ring-red-100"
+                    : "bg-kez-blue text-kez-yellow"
+                    }`}
                 >
                   <Mic size={58} />
                 </div>
@@ -1562,7 +1617,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
     ["reports", "▦", "Reports"],
     ["profile", "◉", "Profile"],
   ]
-  const scores = [
+  const scores: [string, number, number][] = [
     ["Pronunciation", 70, 84],
     ["Fluency", 65, 82],
     ["Grammar", 74, 86],
@@ -1599,11 +1654,10 @@ function TutorApp({ onExit }: { onExit: () => void }) {
             <button
               onClick={() => setPage(id)}
               key={id}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${
-                page === id
-                  ? "bg-kez-blue text-white"
-                  : "text-white/60 hover:bg-white/10 hover:text-white"
-              }`}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${page === id
+                ? "bg-kez-blue text-white"
+                : "text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
             >
               <span className="text-lg">{icon}</span>
               {label}
@@ -1737,11 +1791,10 @@ function TutorApp({ onExit }: { onExit: () => void }) {
                   (x, i) => (
                     <button
                       key={x}
-                      className={`rounded-xl px-4 text-sm font-bold ${
-                        i === 0
-                          ? "bg-kez-blue text-white"
-                          : "bg-white text-slate-500"
-                      }`}
+                      className={`rounded-xl px-4 text-sm font-bold ${i === 0
+                        ? "bg-kez-blue text-white"
+                        : "bg-white text-slate-500"
+                        }`}
                     >
                       {x}
                     </button>
@@ -1821,11 +1874,10 @@ function TutorApp({ onExit }: { onExit: () => void }) {
                       <button
                         onClick={() => setTab(x)}
                         key={x}
-                        className={`rounded-xl px-4 py-2 text-sm font-bold ${
-                          tab === x
-                            ? "bg-kez-blue text-white"
-                            : "bg-white text-slate-500"
-                        }`}
+                        className={`rounded-xl px-4 py-2 text-sm font-bold ${tab === x
+                          ? "bg-kez-blue text-white"
+                          : "bg-white text-slate-500"
+                          }`}
                       >
                         {x}
                       </button>
@@ -1964,72 +2016,72 @@ function TutorApp({ onExit }: { onExit: () => void }) {
           {(page === "progress" ||
             page === "reports" ||
             page === "feedback") && (
-            <section>
-              <div className="rounded-3xl bg-kez-blue p-8 text-white">
-                <p className="text-sm font-bold text-kez-yellow">
-                  JAMIE CRUZ · SPEAKING PROGRESS
-                </p>
-                <div className="mt-5 flex flex-wrap items-center gap-7">
-                  <div>
-                    <p className="text-xs text-blue-200">PRE-ASSESSMENT</p>
-                    <p className="text-5xl font-extrabold">72</p>
-                  </div>
-                  <span className="text-3xl text-kez-yellow">→</span>
-                  <div>
-                    <p className="text-xs text-blue-200">POST-ASSESSMENT</p>
-                    <p className="text-5xl font-extrabold">86</p>
-                  </div>
-                  <div className="rounded-2xl bg-kez-yellow p-4 text-kez-dark">
-                    <p className="text-xs font-bold">IMPROVEMENT</p>
-                    <p className="text-2xl font-extrabold">+14 points</p>
-                    <p className="text-xs">19.4% improvement</p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6 grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
-                <div className="rounded-3xl bg-white p-7 shadow-sm">
-                  <h2 className="font-extrabold">Skill Comparison</h2>
-                  <div className="mt-5 space-y-5">
-                    {scores.map(([name, pre, post]) => (
-                      <div
-                        key={name}
-                        className="grid grid-cols-[1fr_50px_50px_60px] items-center gap-3 text-sm"
-                      >
-                        <b>{name}</b>
-                        <span className="rounded-lg bg-slate-100 p-2 text-center">
-                          {pre}
-                        </span>
-                        <span className="rounded-lg bg-kez-blue-light p-2 text-center font-bold text-kez-blue">
-                          {post}
-                        </span>
-                        <span className="font-bold text-green-600">
-                          +{post - pre}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="rounded-3xl bg-kez-yellow-light p-7">
-                  <p className="text-sm font-bold text-amber-800">
-                    GREATEST IMPROVEMENT
+              <section>
+                <div className="rounded-3xl bg-kez-blue p-8 text-white">
+                  <p className="text-sm font-bold text-kez-yellow">
+                    JAMIE CRUZ · SPEAKING PROGRESS
                   </p>
-                  <h2 className="mt-4 text-2xl font-extrabold">
-                    🎤 Confidence
-                  </h2>
-                  <p className="mt-1 text-4xl font-extrabold">
-                    +19 <span className="text-lg">points</span>
-                  </p>
-                  <textarea
-                    defaultValue="Jamie demonstrates noticeable improvement in fluency, confidence, and pronunciation after completing the speaking activities."
-                    className="mt-7 h-28 w-full rounded-xl border border-amber-200 bg-white/70 p-3 text-sm"
-                  />
-                  <button className="mt-4 rounded-xl bg-kez-dark px-4 py-3 text-sm font-bold text-white">
-                    Save Progress Report
-                  </button>
+                  <div className="mt-5 flex flex-wrap items-center gap-7">
+                    <div>
+                      <p className="text-xs text-blue-200">PRE-ASSESSMENT</p>
+                      <p className="text-5xl font-extrabold">72</p>
+                    </div>
+                    <span className="text-3xl text-kez-yellow">→</span>
+                    <div>
+                      <p className="text-xs text-blue-200">POST-ASSESSMENT</p>
+                      <p className="text-5xl font-extrabold">86</p>
+                    </div>
+                    <div className="rounded-2xl bg-kez-yellow p-4 text-kez-dark">
+                      <p className="text-xs font-bold">IMPROVEMENT</p>
+                      <p className="text-2xl font-extrabold">+14 points</p>
+                      <p className="text-xs">19.4% improvement</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </section>
-          )}
+                <div className="mt-6 grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
+                  <div className="rounded-3xl bg-white p-7 shadow-sm">
+                    <h2 className="font-extrabold">Skill Comparison</h2>
+                    <div className="mt-5 space-y-5">
+                      {scores.map(([name, pre, post]) => (
+                        <div
+                          key={name}
+                          className="grid grid-cols-[1fr_50px_50px_60px] items-center gap-3 text-sm"
+                        >
+                          <b>{name}</b>
+                          <span className="rounded-lg bg-slate-100 p-2 text-center">
+                            {pre}
+                          </span>
+                          <span className="rounded-lg bg-kez-blue-light p-2 text-center font-bold text-kez-blue">
+                            {post}
+                          </span>
+                          <span className="font-bold text-green-600">
+                            +{post - pre}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-3xl bg-kez-yellow-light p-7">
+                    <p className="text-sm font-bold text-amber-800">
+                      GREATEST IMPROVEMENT
+                    </p>
+                    <h2 className="mt-4 text-2xl font-extrabold">
+                      🎤 Confidence
+                    </h2>
+                    <p className="mt-1 text-4xl font-extrabold">
+                      +19 <span className="text-lg">points</span>
+                    </p>
+                    <textarea
+                      defaultValue="Jamie demonstrates noticeable improvement in fluency, confidence, and pronunciation after completing the speaking activities."
+                      className="mt-7 h-28 w-full rounded-xl border border-amber-200 bg-white/70 p-3 text-sm"
+                    />
+                    <button className="mt-4 rounded-xl bg-kez-dark px-4 py-3 text-sm font-bold text-white">
+                      Save Progress Report
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
           {page === "profile" && (
             <section className="max-w-xl rounded-3xl bg-white p-8 shadow-sm">
               <span className="text-5xl">👩🏽</span>
@@ -2056,6 +2108,10 @@ export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [view, setView] = useState<View>("landing")
   const [noProfile, setNoProfile] = useState(false)
+  const [authBanner, setAuthBanner] = useState<{
+    type: "error" | "info" | "success"
+    message: string
+  } | null>(null)
 
   const signOut = async () => {
     console.log("[KezSpeak] Signing out")
@@ -2064,26 +2120,67 @@ export default function App() {
     setAuthState("unauthenticated")
     setView("landing")
     setNoProfile(false)
+    setAuthBanner(null)
   }
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("[KezSpeak] Auth event:", event, "user:", session?.user?.id ?? null)
-        if (session?.user) {
+    // Check URL hash for authentication errors (e.g. otp_expired)
+    if (typeof window !== "undefined" && window.location.hash) {
+      const hash = window.location.hash.substring(1)
+      const params = new URLSearchParams(hash)
+      const error = params.get("error")
+      const errorCode = params.get("error_code")
+      const errorDesc = params.get("error_description")
+
+      if (error || errorCode) {
+        console.warn("[KezSpeak] URL hash error detected:", errorCode, errorDesc)
+        let message =
+          errorDesc?.replace(/\+/g, " ") || "Authentication link error."
+        if (errorCode === "otp_expired" || message.toLowerCase().includes("expired")) {
+          message =
+            "The verification link has expired or was already used. If your account was already verified, you can log in below. Otherwise, enter your email and click 'Resend confirmation email'."
+        }
+        setAuthBanner({ type: "error", message })
+        setView("login")
+        // Clean up hash from browser URL
+        window.history.replaceState(null, "", window.location.pathname)
+      }
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[KezSpeak] Auth event:", event, "user:", session?.user?.id ?? null)
+      if (session?.user) {
+        try {
           const { data, error } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", session.user.id)
-            .single()
+            .maybeSingle()
 
           console.log("[KezSpeak] Profile lookup — data:", data, "error:", error?.message ?? null)
 
-          if (error && (error.message.includes("relation") || error.message.includes("does not exist"))) {
-            console.warn("[KezSpeak] profiles table missing — defaulting to student role")
+          if (data) {
+            const role = (data.role as Profile["role"]) || "student"
+            console.log(
+              "[KezSpeak] Detected role:",
+              role,
+              "→ redirecting to",
+              role === "tutor" ? "/tutor" : role === "admin" ? "/admin" : "/student"
+            )
+            setProfile(data as Profile)
+            setAuthState("authenticated")
+            setNoProfile(false)
+            setView(role === "tutor" ? "tutor" : role === "admin" ? "admin" : "student")
+          } else {
+            console.warn("[KezSpeak] No database profile found — using fallback profile")
             const fallbackProfile: Profile = {
               id: session.user.id,
-              full_name: session.user.user_metadata?.full_name ?? session.user.email ?? "User",
+              full_name:
+                session.user.user_metadata?.full_name ||
+                session.user.email?.split("@")[0] ||
+                "User",
               email: session.user.email ?? "",
               role: "student",
             }
@@ -2091,33 +2188,34 @@ export default function App() {
             setAuthState("authenticated")
             setNoProfile(false)
             setView("student")
-            return
           }
-
-          if (!data || error) {
-            console.warn("[KezSpeak] No profile found for user:", session.user.id)
-            setAuthState("unauthenticated")
-            setNoProfile(true)
-            return
+        } catch (err) {
+          console.error("[KezSpeak] Error during profile lookup:", err)
+          const fallbackProfile: Profile = {
+            id: session.user.id,
+            full_name:
+              session.user.user_metadata?.full_name ||
+              session.user.email?.split("@")[0] ||
+              "User",
+            email: session.user.email ?? "",
+            role: "student",
           }
-
-          const role = data.role as Profile["role"]
-          console.log("[KezSpeak] Detected role:", role, "→ redirecting to", role === "tutor" ? "/tutor" : role === "admin" ? "/admin" : "/student")
-          setProfile(data as Profile)
+          setProfile(fallbackProfile)
           setAuthState("authenticated")
           setNoProfile(false)
-          setView(role === "tutor" ? "tutor" : role === "admin" ? "admin" : "student")
-        } else {
-          setProfile(null)
-          setAuthState("unauthenticated")
-          setView((prev) =>
-            prev === "student" || prev === "tutor" || prev === "admin"
-              ? "landing"
-              : prev,
-          )
+          setView("student")
         }
-      },
-    )
+      } else {
+        setProfile(null)
+        setAuthState("unauthenticated")
+        setView((prev) =>
+          prev === "student" || prev === "tutor" || prev === "admin"
+            ? "landing"
+            : prev
+        )
+      }
+    })
+
     return () => subscription.unsubscribe()
   }, [])
 
@@ -2153,6 +2251,7 @@ export default function App() {
       <Login
         onBack={() => setView("landing")}
         onSignup={() => setView("signup")}
+        banner={authBanner}
       />
     )
   }
