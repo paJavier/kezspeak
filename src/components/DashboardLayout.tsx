@@ -1,7 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useState, type ComponentType, type ReactNode } from "react"
 import ThemeToggle from "./ThemeToggle"
 
-export type NavItem = [id: string, icon: string, label: string]
+// The icon is an emoji string or an icon component (e.g. from lucide-react).
+export type NavIcon = string | ComponentType<{ size?: number; className?: string }>
+export type NavItem = [id: string, icon: NavIcon, label: string]
 
 type Props = {
   brand: ReactNode
@@ -57,14 +59,16 @@ export default function DashboardLayout(props: Props) {
       <p className="mt-8 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-white/35">{workspaceLabel}</p>
       {/* min-h-0 lets the nav scroll instead of pushing the footer off-screen. */}
       <nav className="mt-3 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-        {nav.map(([id, icon, label]) => (
+        {nav.map(([id, Icon, label]) => (
           <button
             key={id}
             onClick={() => navigate(id)}
             aria-current={isActive(id) ? "page" : undefined}
             className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${isActive(id) ? "bg-kez-blue text-white" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
           >
-            <span className="w-6 text-center text-lg">{icon}</span>
+            <span className="grid w-6 place-items-center text-lg">
+              {typeof Icon === "string" ? Icon : <Icon size={19} />}
+            </span>
             {label}
             {badges?.[id] && <b className="ml-auto rounded-full bg-kez-yellow px-2 py-0.5 text-[10px] text-kez-dark">{badges[id]}</b>}
           </button>

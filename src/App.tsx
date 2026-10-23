@@ -1,4 +1,21 @@
-import { FormEvent, createContext, useContext, useEffect, useState } from "react"
+import { type ComponentType, FormEvent, createContext, useContext, useEffect, useState } from "react"
+import { type User as AuthUser } from "@supabase/supabase-js"
+import {
+  AlertCircle,
+  BarChart3,
+  ClipboardCheck,
+  Headphones,
+  Link2,
+  ListChecks,
+  LayoutDashboard,
+  MessageCircle,
+  MessageSquare,
+  ShieldCheck,
+  Target,
+  TrendingUp,
+  User,
+  Users,
+} from "lucide-react"
 import { arrivedFromInvite, arrivedToSetPassword, supabase, type Profile } from "./lib/supabase"
 import SetPasswordScreen from "./components/SetPasswordScreen"
 import ThemeToggle from "./components/ThemeToggle"
@@ -24,16 +41,23 @@ type View = "landing" | "login" | "signup" | "student" | "tutor" | "admin"
 type AuthState = "loading" | "authenticated" | "unauthenticated"
 
 type AuthContextType = {
+  user: AuthUser | null
   profile: Profile | null
+  role: Profile["role"] | null
+  loading: boolean
   signOut: () => Promise<void>
 }
 const AuthContext = createContext<AuthContextType>({
+  user: null,
   profile: null,
-  signOut: async () => { },
+  role: null,
+  loading: true,
+  signOut: async () => {},
 })
 const useAuth = () => useContext(AuthContext)
 
 type IconProps = { className?: string; size?: number }
+type IconComponent = ComponentType<IconProps>
 
 const Arrow = ({ className = "", size = 18 }: IconProps) => (
   <svg
@@ -98,7 +122,7 @@ function NoProfileScreen({ onSignOut }: { onSignOut: () => void }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-kez-blue-light px-6 text-center">
       <div className="grid size-16 place-items-center rounded-2xl bg-red-100 text-red-500">
-        <span className="text-2xl">⚠️</span>
+        <AlertCircle size={28} aria-hidden="true" />
       </div>
       <div>
         <p className="text-lg font-extrabold text-kez-dark">
@@ -172,12 +196,12 @@ function HeroVideo() {
   )
 }
 
-const journeys = [
-  ["01", "🎤", "Assess", "Discover your current speaking proficiency."],
-  ["02", "🗣️", "Practice", "Complete engaging English speaking activities."],
-  ["03", "🌱", "Improve", "Build fluency, vocabulary, and confidence."],
-  ["04", "🎯", "Reassess", "Complete your post-assessment."],
-  ["05", "📈", "See Your Growth", "Compare results and measure improvement."],
+const journeys: [string, IconComponent, string, string][] = [
+  ["01", Mic, "Assess", "Discover your current speaking proficiency."],
+  ["02", MessageCircle, "Practice", "Complete engaging English speaking activities."],
+  ["03", TrendingUp, "Improve", "Build fluency, vocabulary, and confidence."],
+  ["04", Target, "Reassess", "Complete your post-assessment."],
+  ["05", BarChart3, "See Your Growth", "Compare results and measure improvement."],
 ]
 
 const features = [
@@ -209,21 +233,9 @@ const features = [
 
 function FeatureGlyph({ type }: { type: string }) {
   if (type === "mic") return <Mic size={28} />
-  if (type === "chat") return <span className="text-3xl leading-none">💬</span>
-  if (type === "notes") return <span className="text-3xl leading-none">✦</span>
-  return (
-    <svg
-      width="30"
-      height="30"
-      viewBox="0 0 30 30"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-    >
-      <path d="M5 24V16M15 24V7M25 24v-12" />
-    </svg>
-  )
+  if (type === "chat") return <MessageSquare size={28} />
+  if (type === "notes") return <ClipboardCheck size={28} />
+  return <BarChart3 size={30} />
 }
 
 function Landing({
@@ -304,15 +316,9 @@ function Landing({
             </div>
             <div className="mt-12 flex items-center gap-4">
               <div className="flex -space-x-3">
-                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-pink-200 text-xs">
-                  😊
-                </span>
-                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-sky-200 text-xs">
-                  👋
-                </span>
-                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-orange-200 text-xs">
-                  🧑🏽
-                </span>
+                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-pink-200 text-kez-blue"><User size={16} /></span>
+                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-sky-200 text-kez-blue"><Users size={16} /></span>
+                <span className="grid size-9 place-items-center rounded-full border-2 border-white bg-orange-200 text-kez-blue"><MessageCircle size={16} /></span>
               </div>
               <p className="text-sm font-medium text-slate-500">
                 <b className="text-kez-dark">Kez learners</b> are finding
@@ -338,7 +344,7 @@ function Landing({
             </div>
             <div className="relative grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <div className="absolute left-[9%] right-[9%] top-11 hidden h-px bg-blue-200 lg:block" />
-              {journeys.map(([number, emoji, title, description], index) => (
+              {journeys.map(([number, JourneyIcon, title, description], index) => (
                 <article
                   key={title}
                   className="relative rounded-2xl border border-blue-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
@@ -347,8 +353,8 @@ function Landing({
                     <span className="font-mono text-xs font-bold text-kez-blue">
                       {number}
                     </span>
-                    <span className="grid size-11 place-items-center rounded-xl bg-kez-yellow-light text-xl">
-                      {emoji}
+                    <span className="grid size-11 place-items-center rounded-xl bg-kez-yellow-light text-kez-blue">
+                      <JourneyIcon size={21} />
                     </span>
                   </div>
                   <h3 className="font-bold text-kez-dark">{title}</h3>
@@ -435,8 +441,7 @@ function Landing({
                 <Mic size={25} />
               </span>
               <h2 className="text-4xl font-extrabold tracking-[-.045em] sm:text-5xl">
-                Ready to find your voice?{" "}
-                <span className="inline-block">🎤</span>
+                Ready to find your voice?
               </h2>
               <p className="mt-5 max-w-[500px] text-lg leading-8 text-blue-100">
                 Start your English speaking journey and discover what you can
@@ -674,7 +679,7 @@ function Login({
           <div className="w-full">
             <div className="mb-8">
               <h2 className="text-4xl font-extrabold tracking-[-.045em] text-kez-dark">
-                Welcome back! <span>👋</span>
+                Welcome back!
               </h2>
               <p className="mt-3 text-slate-500">
                 Log in to continue your speaking journey.
@@ -797,6 +802,10 @@ function Signup({
   onLogin: () => void
 }) {
   const [created, setCreated] = useState(false)
+  const [confirmationEmail, setConfirmationEmail] = useState("")
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resendMessage, setResendMessage] = useState("")
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -804,15 +813,24 @@ function Signup({
   const [errorMsg, setErrorMsg] = useState("")
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = window.setTimeout(() => setResendCooldown((seconds) => seconds - 1), 1000)
+    return () => window.clearTimeout(timer)
+  }, [resendCooldown])
+
   async function submit(event: FormEvent) {
     event.preventDefault()
     setErrorMsg("")
 
-    if (!fullName.trim()) {
+    const normalizedName = fullName.trim()
+    const normalizedEmail = email.trim()
+
+    if (!normalizedName) {
       setErrorMsg("Please enter your full name.")
       return
     }
-    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
+    if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
       setErrorMsg("Please enter a valid email address.")
       return
     }
@@ -826,31 +844,86 @@ function Signup({
     }
 
     setLoading(true)
-    console.log("[KezSpeak] Signing up:", email)
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: { full_name: normalizedName },
+          emailRedirectTo: window.location.origin,
+        },
+      })
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { 
-        data: { full_name: fullName },
-        emailRedirectTo: window.location.origin,
-      },
-    })
+      console.log("[KezSpeak] Signup response", {
+        userId: data?.user?.id ?? null,
+        email: data?.user?.email ?? null,
+        identitiesCount: data?.user?.identities?.length ?? null,
+        hasSession: !!data?.session,
+        error: error
+          ? { message: error.message, status: error.status, code: error.code }
+          : null,
+      })
 
-    setLoading(false)
+      if (error) {
+        const message = error.message.toLowerCase()
+        setErrorMsg(
+          message.includes("already registered") || message.includes("already exists")
+            ? "An account with this email already exists."
+            : message.includes("password")
+              ? "Password does not meet the required requirements."
+              : "Unable to create your account. Please try again.",
+        )
+        return
+      }
 
-    if (error) {
-      console.log("[KezSpeak] Signup failed:", error.message)
+      if (!data.user) {
+        console.warn("[KezSpeak] Signup returned no user and no error")
+        setErrorMsg("Unable to create your account. Please try again.")
+        return
+      }
+
+      if (data.user.identities?.length === 0) {
+        setErrorMsg("An account with this email may already exist. Try logging in or resetting your password.")
+        return
+      }
+
+      if (!data.session) {
+        setConfirmationEmail(data.user.email ?? normalizedEmail)
+        setCreated(true)
+      }
+    } catch (error) {
+      console.error("[KezSpeak] Signup request failed:", {
+        message: error instanceof Error ? error.message : "Unknown request error",
+      })
       setErrorMsg(
-        error.message.includes("already registered")
-          ? "An account with this email already exists."
-          : "We couldn't create your account. Please try again.",
+        "Unable to reach the account service. Check your connection and try again.",
       )
-      return
+    } finally {
+      setLoading(false)
     }
+  }
 
-    console.log("[KezSpeak] Signup succeeded")
-    setCreated(true)
+  async function resendConfirmation() {
+    if (!confirmationEmail || resendLoading || resendCooldown > 0) return
+    setResendLoading(true)
+    setResendMessage("")
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: confirmationEmail,
+        options: { emailRedirectTo: window.location.origin },
+      })
+      if (error) {
+        setResendMessage("We couldn't send the confirmation email. Please try again later.")
+      } else {
+        setResendMessage("Confirmation email sent.")
+        setResendCooldown(30)
+      }
+    } catch {
+      setResendMessage("We couldn't send the confirmation email. Please try again later.")
+    } finally {
+      setResendLoading(false)
+    }
   }
 
   return (
@@ -910,21 +983,43 @@ function Signup({
                   Account created!
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Check your email to confirm your account, then log in to
-                  start your speaking journey.
+                  We've sent a confirmation link to:
+                </p>
+                <p className="mt-2 break-all text-sm font-bold text-kez-dark">
+                  {confirmationEmail}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Please check your inbox and click the link before logging in.
                 </p>
                 <button
                   onClick={onLogin}
                   className="mt-7 h-13 w-full rounded-xl bg-kez-blue text-sm font-bold text-white shadow-lg shadow-blue-900/15"
                 >
-                  Go to Log In
+                  Back to Login
                 </button>
+                <button
+                  type="button"
+                  onClick={resendConfirmation}
+                  disabled={resendLoading || resendCooldown > 0}
+                  className="mt-4 text-sm font-bold text-kez-blue disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {resendLoading
+                    ? "Sending..."
+                    : resendCooldown > 0
+                      ? `Resend available in ${resendCooldown}s`
+                      : "Resend confirmation email"}
+                </button>
+                {resendMessage && (
+                  <p role="status" className="mt-2 text-sm text-slate-600">
+                    {resendMessage}
+                  </p>
+                )}
               </div>
             ) : (
               <>
                 <div className="mb-8">
                   <h1 className="text-4xl font-extrabold tracking-[-.045em] text-kez-dark">
-                    Create your account <span>✨</span>
+                    Create your account
                   </h1>
                   <p className="mt-3 text-slate-500">
                     A few details and you’ll be ready to speak.
@@ -1024,14 +1119,14 @@ function Signup({
   )
 }
 
-const studentNav = [
-  ["dashboard", "⌂", "Dashboard"],
-  ["assessment", "🎤", "My Assessment"],
-  ["activities", "🗣", "Speaking Activities"],
-  ["feedback", "💬", "Feedback"],
-  ["progress", "↗", "My Progress"],
-  ["results", "▦", "Results"],
-  ["profile", "◉", "Profile"],
+const studentNav: NavItem[] = [
+  ["dashboard", LayoutDashboard, "Dashboard"],
+  ["assessment", ClipboardCheck, "My Assessment"],
+  ["activities", MessageCircle, "Speaking Activities"],
+  ["feedback", MessageSquare, "Feedback"],
+  ["progress", TrendingUp, "My Progress"],
+  ["results", BarChart3, "Results"],
+  ["profile", User, "Profile"],
 ]
 function StudentApp({ onExit }: { onExit: () => void }) {
   const { profile, signOut } = useAuth()
@@ -1063,7 +1158,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
       workspaceLabel="My space"
       eyebrow="KezSpeak Student"
       title={titles[page]}
-      nav={studentNav as NavItem[]}
+      nav={studentNav}
       isActive={(id) => page === id || (id === "activities" && page === "activity")}
       onNavigate={setPage}
       userName={profile?.full_name ?? "Student"}
@@ -1108,23 +1203,23 @@ function TutorApp({ onExit }: { onExit: () => void }) {
   useEffect(reload, [page, reload])
   const pendingCount = submissions?.filter(needsReview).length ?? 0
 
-  const nav = [
-    ["dashboard", "⌂", "Dashboard"],
+  const nav: NavItem[] = [
+    ["dashboard", LayoutDashboard, "Dashboard"],
     ...(isSuperAdmin
-      ? [
-          ["users", "🛡", "Users"],
-          ["assignments", "🔗", "Assignments"],
-          ["tasks", "📝", "Tasks"],
-        ]
+      ? ([
+          ["users", ShieldCheck, "Users"],
+          ["assignments", Link2, "Assignments"],
+          ["tasks", ListChecks, "Tasks"],
+        ] as NavItem[])
       : []),
-    ["learners", "👥", "Learners"],
-    ["submissions", "🎤", "Assessments"],
-    ["activities", "🗣", "Speaking Activities"],
-    ["review", "🎧", "Submissions"],
-    ["feedback", "💬", "Feedback"],
-    ["progress", "↗", "Progress"],
-    ["reports", "▦", "Reports"],
-    ["profile", "◉", "Profile"],
+    ["learners", Users, "Learners"],
+    ["submissions", ClipboardCheck, "Assessments"],
+    ["activities", MessageCircle, "Speaking Activities"],
+    ["review", Headphones, "Submissions"],
+    ["feedback", MessageSquare, "Feedback"],
+    ["progress", TrendingUp, "Progress"],
+    ["reports", BarChart3, "Reports"],
+    ["profile", User, "Profile"],
   ]
   const titles: Record<string, string> = {
     dashboard: `${greeting()}, ${firstName}! 👋`,
@@ -1150,7 +1245,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
       workspaceLabel={isSuperAdmin ? "Super admin workspace" : "Tutor workspace"}
       eyebrow="KezSpeak Tutor"
       title={titles[page]}
-      nav={nav as NavItem[]}
+      nav={nav}
       isActive={(id) => page === id}
       onNavigate={navigate}
       badges={pendingCount ? { review: String(pendingCount) } : undefined}
@@ -1196,8 +1291,17 @@ function TutorApp({ onExit }: { onExit: () => void }) {
   )
 }
 
+const ROLES: Profile["role"][] = ["student", "tutor", "admin", "super_admin"]
+
+// Super admins use the admin workspace (same URL and dashboard as admins).
+const homePathFor = (role: Profile["role"]) =>
+  role === "tutor" ? "/tutor" : role === "admin" || role === "super_admin" ? "/admin" : "/student"
+const viewFor = (role: Profile["role"]): View =>
+  role === "tutor" ? "tutor" : role === "admin" || role === "super_admin" ? "admin" : "student"
+
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>("loading")
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [view, setView] = useState<View>("landing")
   const [noProfile, setNoProfile] = useState(false)
@@ -1207,127 +1311,136 @@ export default function App() {
     type: "error" | "info" | "success"
     message: string
   } | null>(null)
+  const [path, setPath] = useState(() => window.location.pathname)
+
+  const navigate = (nextPath: string, replace = false) => {
+    if (window.location.pathname !== nextPath) window.history[replace ? "replaceState" : "pushState"]({}, "", nextPath)
+    setPath(nextPath)
+  }
 
   const signOut = async () => {
     console.log("[KezSpeak] Signing out")
     await supabase.auth.signOut()
+    setUser(null)
     setProfile(null)
     setAuthState("unauthenticated")
-    setView("landing")
+    setView("login")
     setNoProfile(false)
     setAuthBanner(null)
+    navigate("/login", true)
   }
 
   useEffect(() => {
     // Check URL hash for authentication errors (e.g. otp_expired)
     if (typeof window !== "undefined" && window.location.hash) {
-      const hash = window.location.hash.substring(1)
-      const params = new URLSearchParams(hash)
+      const params = new URLSearchParams(window.location.hash.substring(1))
       const error = params.get("error")
       const errorCode = params.get("error_code")
       const errorDesc = params.get("error_description")
 
       if (error || errorCode) {
         console.warn("[KezSpeak] URL hash error detected:", errorCode, errorDesc)
-        let message =
-          errorDesc?.replace(/\+/g, " ") || "Authentication link error."
+        let message = errorDesc?.replace(/\+/g, " ") || "Authentication link error."
         if (errorCode === "otp_expired" || message.toLowerCase().includes("expired")) {
           message =
             "The verification link has expired or was already used. If your account was already verified, you can log in below. Otherwise, enter your email and click 'Resend confirmation email'."
         }
         setAuthBanner({ type: "error", message })
-        setView("login")
-        // Clean up hash from browser URL
-        window.history.replaceState(null, "", window.location.pathname)
+        // Clean up the hash and show the login page.
+        window.history.replaceState(null, "", "/login")
+        setPath("/login")
       }
+    }
+
+    const showNoProfile = () => {
+      setProfile(null)
+      setAuthState("unauthenticated")
+      setNoProfile(true)
     }
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("[KezSpeak] Auth event:", event, "user:", session?.user?.id ?? null)
       if (event === "PASSWORD_RECOVERY") setMustSetPassword(true)
-      if (session?.user) {
-        try {
-          const lookup = () =>
-            supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle()
-          let { data, error } = await lookup()
-          if (!data && !error) {
-            // A brand-new account's profile is created by a database trigger;
-            // give it a moment before falling back.
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-            ;({ data, error } = await lookup())
+
+      // Run Supabase queries outside this callback: awaiting them inside it can
+      // deadlock the auth client.
+      window.setTimeout(() => {
+        void (async () => {
+          if (!session?.user) {
+            setUser(null)
+            setProfile(null)
+            setAuthState("unauthenticated")
+            setNoProfile(false)
+            setView((prev) => (prev === "student" || prev === "tutor" || prev === "admin" ? "landing" : prev))
+            return
           }
+          setUser(session.user)
 
-          console.log("[KezSpeak] Profile lookup — data:", data, "error:", error?.message ?? null)
+          try {
+            const lookup = () => supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle()
+            let { data, error } = await lookup()
+            if (!data && !error) {
+              // A brand-new account's profile is created by a database trigger;
+              // give it a moment before giving up.
+              await new Promise((resolve) => setTimeout(resolve, 1000))
+              ;({ data, error } = await lookup())
+            }
 
-          if (data) {
-            const role = (data.role as Profile["role"]) || "student"
-            const isAdmin = role === "admin" || role === "super_admin"
-            console.log(
-              "[KezSpeak] Detected role:",
-              role,
-              "→ redirecting to",
-              role === "tutor" ? "/tutor" : isAdmin ? "/admin" : "/student"
-            )
+            console.log("[KezSpeak] Profile lookup — data:", data, "error:", error?.message ?? null)
+
+            if (!data) {
+              console.warn("[KezSpeak] No profile found for the authenticated user")
+              showNoProfile()
+              return
+            }
+
+            const role = data.role as Profile["role"]
+            if (!ROLES.includes(role)) {
+              console.warn("[KezSpeak] Unknown role on profile:", role)
+              showNoProfile()
+              return
+            }
+            console.log("[KezSpeak] Detected role:", role, "→ redirecting to", homePathFor(role))
             setProfile(data as Profile)
             setAuthState("authenticated")
             setNoProfile(false)
-            setView(role === "tutor" ? "tutor" : isAdmin ? "admin" : "student")
-          } else {
-            console.warn(
-              "[KezSpeak] No database profile found — using a temporary fallback. Saving recordings will fail until a profiles row exists (see migration 20261027_profile_on_signup.sql)."
-            )
-            const fallbackProfile: Profile = {
-              id: session.user.id,
-              full_name:
-                session.user.user_metadata?.full_name ||
-                session.user.email?.split("@")[0] ||
-                "User",
-              email: session.user.email ?? "",
-              role: "student",
-            }
-            setProfile(fallbackProfile)
-            setAuthState("authenticated")
-            setNoProfile(false)
-            setView("student")
+            setView(viewFor(role))
+          } catch (err) {
+            console.error("[KezSpeak] Error during profile lookup:", err)
+            showNoProfile()
           }
-        } catch (err) {
-          console.error("[KezSpeak] Error during profile lookup:", err)
-          const fallbackProfile: Profile = {
-            id: session.user.id,
-            full_name:
-              session.user.user_metadata?.full_name ||
-              session.user.email?.split("@")[0] ||
-              "User",
-            email: session.user.email ?? "",
-            role: "student",
-          }
-          setProfile(fallbackProfile)
-          setAuthState("authenticated")
-          setNoProfile(false)
-          setView("student")
-        }
-      } else {
-        setProfile(null)
-        setAuthState("unauthenticated")
-        setView((prev) =>
-          prev === "student" || prev === "tutor" || prev === "admin"
-            ? "landing"
-            : prev
-        )
-      }
+        })()
+      }, 0)
     })
 
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    const onPopState = () => setPath(window.location.pathname)
+    window.addEventListener("popstate", onPopState)
+    return () => window.removeEventListener("popstate", onPopState)
+  }, [])
+
+  useEffect(() => {
+    if (authState === "authenticated" && profile) {
+      const ownPath = homePathFor(profile.role)
+      if (path !== ownPath) navigate(ownPath, true)
+      return
+    }
+    if (authState === "unauthenticated" && !noProfile && ["/student", "/tutor", "/admin"].includes(path)) {
+      navigate("/login", true)
+    }
+  }, [authState, noProfile, path, profile])
 
   if (authState === "loading") return <LoadingScreen />
 
   if (noProfile)
     return <NoProfileScreen onSignOut={signOut} />
 
-  const authValue = { profile, signOut }
+  const authValue = { user, profile, role: profile?.role ?? null, loading: false, signOut }
 
   if (authState === "authenticated" && mustSetPassword)
     return (
@@ -1339,13 +1452,7 @@ export default function App() {
     )
 
   if (authState === "authenticated") {
-    if (view === "tutor")
-      return (
-        <AuthContext.Provider value={authValue}>
-          <TutorApp onExit={signOut} />
-        </AuthContext.Provider>
-      )
-    if (view === "admin")
+    if (view === "tutor" || view === "admin")
       return (
         <AuthContext.Provider value={authValue}>
           <TutorApp onExit={signOut} />
@@ -1358,27 +1465,27 @@ export default function App() {
     )
   }
 
-  if (view === "login") {
+  if (path === "/login") {
     return (
       <Login
-        onBack={() => setView("landing")}
-        onSignup={() => setView("signup")}
+        onBack={() => navigate("/")}
+        onSignup={() => navigate("/signup")}
         banner={authBanner}
       />
     )
   }
-  if (view === "signup") {
+  if (path === "/signup") {
     return (
       <Signup
-        onBack={() => setView("landing")}
-        onLogin={() => setView("login")}
+        onBack={() => navigate("/")}
+        onLogin={() => navigate("/login")}
       />
     )
   }
   return (
     <Landing
-      onLogin={() => setView("login")}
-      onSignup={() => setView("signup")}
+      onLogin={() => navigate("/login")}
+      onSignup={() => navigate("/signup")}
     />
   )
 }
