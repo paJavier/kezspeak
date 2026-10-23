@@ -11,9 +11,95 @@
   --color-kez-dark: #0F172A;
 }
 
+/* Lets new code opt in with `dark:` utilities; existing screens are remapped below. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root { font-family: 'Poppins', system-ui, sans-serif; color: #0F172A; background: #fff; }
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 ::selection { background: #FACC15; color: #0F172A; }
+
+/* ---------------------------------------------------------------------------
+   Dark mode. Toggled by the `dark` class on <html> (see src/lib/theme.ts).
+   The screens use light utility classes, so instead of adding `dark:` to every
+   component, this remaps those classes in one place. `text-white` and the
+   brand blue/yellow fills are intentionally untouched (buttons, sidebar).
+   ------------------------------------------------------------------------- */
+.dark {
+  color-scheme: dark;
+  --dk-page: #0b1120;
+  --dk-card: #111a2e;
+  --dk-sunken: #172036;
+  --dk-raised: #1e293b;
+  --dk-line: #26324a;
+  --dk-line-strong: #3a4763;
+  --dk-text: #e2e8f0;
+  background: var(--dk-page);
+  color: var(--dk-text);
+}
+
+/* Surfaces */
+.dark :is(.bg-white, .hover\:bg-white:hover) { background-color: var(--dk-card); }
+.dark .bg-white\/95 { background-color: rgb(17 26 46 / 0.95); }
+.dark .bg-white\/80 { background-color: rgb(17 26 46 / 0.8); }
+.dark .bg-white\/70 { background-color: rgb(17 26 46 / 0.7); }
+.dark .bg-\[\#f8fbff\] { background-color: var(--dk-page); }
+.dark :is(.bg-slate-50, .hover\:bg-slate-50:hover) { background-color: var(--dk-sunken); }
+.dark .bg-slate-100 { background-color: var(--dk-raised); }
+.dark :is(.bg-kez-blue-light, .hover\:bg-kez-blue-light:hover) { background-color: #18254a; }
+.dark :is(.bg-blue-50, .bg-blue-100) { background-color: #1b2c5c; }
+.dark .bg-kez-yellow-light { background-color: #33290b; }
+.dark .bg-amber-50 { background-color: #2f2309; }
+.dark .bg-amber-100 { background-color: #44310b; }
+.dark .bg-green-50 { background-color: #0e2a1d; }
+.dark .bg-red-50 { background-color: #351318; }
+.dark .bg-red-100 { background-color: #4a1a21; }
+.dark :is(.bg-violet-50, .bg-violet-50\/60) { background-color: #211938; }
+.dark .bg-violet-100 { background-color: #2e2150; }
+.dark :is(.bg-pink-50, .bg-pink-100) { background-color: #34142b; }
+
+/* Text */
+.dark .text-kez-dark { color: var(--dk-text); }
+.dark .text-slate-700 { color: #cbd5e1; }
+.dark .text-slate-600 { color: #b4c0d3; }
+.dark .text-slate-500 { color: #94a3b8; }
+.dark :is(.text-slate-400, .placeholder\:text-slate-400::placeholder) { color: #7a889f; }
+.dark .text-kez-blue { color: #8fb0ff; }
+.dark .text-blue-900 { color: #bfdbfe; }
+.dark .text-amber-700 { color: #fbbf24; }
+.dark .text-amber-800 { color: #fcd34d; }
+.dark .text-amber-900 { color: #fde68a; }
+.dark .text-green-700 { color: #6ee7a0; }
+.dark .text-green-800 { color: #86efac; }
+.dark .text-green-900 { color: #bbf7d0; }
+.dark :is(.text-red-500, .text-red-600) { color: #f87171; }
+.dark .text-red-700 { color: #fca5a5; }
+.dark .text-red-800 { color: #fecaca; }
+.dark .text-violet-700 { color: #c4b5fd; }
+.dark .text-violet-800 { color: #ddd6fe; }
+.dark .text-violet-950 { color: #ede9fe; }
+
+/* Dark text stays dark on the yellow brand fill (buttons, avatars, badges). */
+.dark .bg-kez-yellow,
+.dark .bg-kez-yellow .text-kez-dark,
+.dark .bg-kez-yellow.text-kez-dark { color: #0f172a; }
+
+/* Borders and rings */
+.dark .border-slate-50 { border-color: var(--dk-sunken); }
+.dark .border-slate-100 { border-color: var(--dk-line); }
+.dark .border-slate-200 { border-color: var(--dk-line-strong); }
+.dark .border-slate-300 { border-color: #475569; }
+.dark :is(.border-blue-100, .border-blue-200) { border-color: #1e3a8a; }
+.dark .border-green-200 { border-color: #14532d; }
+.dark .border-amber-200 { border-color: #713f12; }
+.dark .border-violet-200 { border-color: #4c3a80; }
+.dark :is(.focus\:border-kez-blue:focus, .hover\:border-kez-blue:hover, .border-kez-blue) { border-color: #5b84f5; }
+.dark .focus\:ring-blue-100:focus { --tw-ring-color: #1e3a8a; }
+
+/* Unstyled form controls follow the theme. */
+.dark :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  color: var(--dk-text);
+}
+.dark select option { background-color: var(--dk-card); }

@@ -1,0 +1,18 @@
+# Supabase CLI config, only what's needed to deploy the Edge Function.
+# The code lives in functions/server/ but its routes are prefixed with
+# /make-server-8450f8e5, so it must be deployed under that name:
+#   npx supabase functions deploy make-server-8450f8e5 --project-ref <project-ref>
+
+[functions.make-server-8450f8e5]
+entrypoint = "./functions/server/index.tsx"
+verify_jwt = true
+
+# Formal KezSpeak auth emails. Paste the HTML into Dashboard -> Authentication ->
+# Email Templates, or apply with `npx supabase config push --project-ref <ref>`.
+[auth.email.template.invite]
+subject = "Your KezSpeak account invitation - Kez Tutorial Service"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Reset your KezSpeak password"
+content_path = "./supabase/templates/recovery.html"
