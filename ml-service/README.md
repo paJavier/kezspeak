@@ -36,7 +36,7 @@ production_model.save_model(f"{DRIVE_RESULTS}/kezspeak_production_xgboost.json")
 
 ### Database
 
-Run the files in `../supabase/migrations/` in date order in the Supabase SQL editor (see `SETUP.md`; the shared team project already has all of them). The first one creates the tasks, assignments, submissions, evaluations and tutor_feedback tables, the row-level security rules, and the private `recordings` bucket.
+Run the files in `../supabase/migrations/` in date order in the Supabase SQL editor (see `SETUP.md`; the shared team project already has all of them, and the SQL files are shared privately rather than committed). The first one creates the tasks, assignments, submissions, evaluations and tutor_feedback tables, the row-level security rules, and the private `recordings` bucket.
 
 A tutor only sees a learner's recordings after an assignment links them:
 

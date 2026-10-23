@@ -8,7 +8,7 @@ How to get KezSpeak running on your own laptop, from a fresh clone to recording 
 |---|---|---|---|
 | Web app | `src/` | React 19 + Vite + Tailwind. Learner, tutor and admin dashboards | http://localhost:8443 |
 | ML service | `ml-service/` | Python FastAPI. Whisper transcript → 40 acoustic + 15 NLP features → XGBoost score. Also account management and the Gemini comparison | http://localhost:8000 |
-| Database & auth | `supabase/` | SQL migrations, email templates, an Edge Function (not deployed yet) | Our shared Supabase project (cloud) |
+| Database & auth | `supabase/` | Email templates, an Edge Function (not deployed yet). SQL migrations are shared privately, not in git | Our shared Supabase project (cloud) |
 
 **Flow:** the learner records in the browser → audio goes to Supabase Storage → the browser asks the ML service to process it → the ML service writes the transcript, features and score back to Supabase → the learner and tutor see the result.
 
@@ -108,7 +108,7 @@ $env:ENABLE_GRAMMAR="false"; .venv\Scripts\python -m pytest
 
 We share **one** Supabase project, and **all migrations are already applied**. Don't run them again.
 
-For reference, or for a brand-new project, run these in date order in **Supabase → SQL Editor**:
+The SQL files are **not on GitHub** (`supabase/migrations/` is git-ignored). If you ever need them, for example for a brand-new Supabase project, get them privately from a teammate, put them in `supabase/migrations/`, and run them in date order in **Supabase → SQL Editor**:
 
 | File | Adds |
 |---|---|

@@ -32,4 +32,5 @@ __pycache__/
 /.plugins/
 /.opencode-skills/
 ml-service/model/desktop.ini
-supabase/migrations/20261027_profile_on_signup.sql
+# Database migrations are shared privately within the team, not on GitHub.
+supabase/migrations/
