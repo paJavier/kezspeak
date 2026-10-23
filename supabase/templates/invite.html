@@ -1,0 +1,82 @@
+<!--
+  KezSpeak invite email. Paste into Supabase dashboard:
+  Authentication -> Email Templates -> Invite user
+  Subject: Your KezSpeak account invitation - Kez Tutorial Service
+
+  Variables: .ConfirmationURL and .Email come from Supabase; .Data.full_name,
+  .Data.role_label and .Data.role_intro are set by ml-service (app/admin.py).
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your KezSpeak account invitation</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#EFF6FF;font-family:Arial,Helvetica,sans-serif;color:#0F172A;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#EFF6FF;padding:32px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:#1E40AF;padding:28px 32px;">
+                <p style="margin:0;font-size:22px;font-weight:bold;color:#FFFFFF;letter-spacing:0.5px;">KezSpeak</p>
+                <p style="margin:4px 0 0;font-size:13px;color:#BFDBFE;">Kez Tutorial Service &middot; English Speaking Assessment</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <p style="margin:0 0 16px;font-size:16px;">Dear {{ .Data.full_name }},</p>
+                <p style="margin:0 0 16px;font-size:15px;line-height:24px;">{{ .Data.role_intro }}</p>
+
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;background-color:#F8FAFC;border-radius:12px;">
+                  <tr>
+                    <td style="padding:16px 20px;font-size:14px;line-height:22px;">
+                      <span style="color:#64748B;">Account email:</span> <strong>{{ .Email }}</strong><br />
+                      <span style="color:#64748B;">Role:</span> <strong>{{ .Data.role_label }}</strong>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 24px;font-size:15px;line-height:24px;">
+                  To activate your account, please click the button below and choose a password of your own.
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                  <tr>
+                    <td style="background-color:#FACC15;border-radius:10px;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#0F172A;text-decoration:none;">Activate my account</a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 8px;font-size:13px;line-height:20px;color:#64748B;">
+                  If the button does not work, copy and paste this link into your browser:
+                </p>
+                <p style="margin:0 0 24px;font-size:12px;line-height:18px;word-break:break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#1E40AF;">{{ .ConfirmationURL }}</a>
+                </p>
+
+                <p style="margin:0 0 24px;font-size:13px;line-height:20px;color:#64748B;">
+                  For your security, this link can only be used once and expires after a short time. If it has
+                  expired, please ask your administrator to send a new invitation. If you were not expecting this
+                  email, you may safely ignore it.
+                </p>
+
+                <p style="margin:0;font-size:15px;line-height:24px;">
+                  Kind regards,<br />
+                  <strong>Kez Tutorial Service</strong>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px;background-color:#F8FAFC;font-size:12px;line-height:18px;color:#94A3B8;">
+                This is an automated message from KezSpeak. Please do not reply to this email.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -1,0 +1,33 @@
+# API
+fastapi==0.120.4
+# Pinned past the multipart-upload and Range-header DoS fixes (0.47.2 / 0.49.1).
+starlette==0.49.3
+uvicorn[standard]==0.34.0
+python-dotenv==1.0.1
+python-multipart==0.0.20
+supabase==2.11.0
+
+# Audio + speech-to-text
+av==14.0.1
+faster-whisper==1.1.1
+librosa==0.10.2.post1
+praat-parselmouth==0.4.5
+soundfile==0.12.1
+
+# NLP (shown to tutors; the deployed model is audio-only)
+spacy==3.8.3
+language-tool-python==2.8.1
+
+# Model
+# Colab trained with 3.4.1 (needs Python 3.12). 2.x mis-reads the 3.x pickle's
+# base_score (0.5 instead of ~84), so every prediction collapses to 0. Stay on 3.x.
+xgboost==3.2.0
+scikit-learn==1.6.0
+joblib==1.4.2
+numpy==1.26.4
+pandas==2.2.3
+
+# Evaluation + tests
+jiwer==3.0.5
+pytest==8.3.4
+httpx==0.28.1

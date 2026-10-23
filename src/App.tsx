@@ -1,5 +1,24 @@
 import { FormEvent, createContext, useContext, useEffect, useState } from "react"
-import { supabase, type Profile } from "./lib/supabase"
+import { arrivedFromInvite, arrivedToSetPassword, supabase, type Profile } from "./lib/supabase"
+import SetPasswordScreen from "./components/SetPasswordScreen"
+import ThemeToggle from "./components/ThemeToggle"
+import { Mic, Play, Wave } from "./components/icons"
+import AssessmentResults from "./components/student/AssessmentResults"
+import RecordActivity from "./components/student/RecordActivity"
+import SubmissionReview from "./components/tutor/SubmissionReview"
+import DashboardLayout, { type NavItem } from "./components/DashboardLayout"
+import AssignmentManagement from "./components/admin/AssignmentManagement"
+import TaskManagement from "./components/admin/TaskManagement"
+import UserManagement from "./components/admin/UserManagement"
+import ProfileCard from "./components/ProfileCard"
+import TaskCatalog from "./components/TaskCatalog"
+import AssessmentPath from "./components/student/AssessmentPath"
+import StudentDashboard from "./components/student/StudentDashboard"
+import LearnerOverview from "./components/tutor/LearnerOverview"
+import LearnerProgress from "./components/tutor/LearnerProgress"
+import TutorDashboard from "./components/tutor/TutorDashboard"
+import useSubmissionList from "./hooks/useSubmissionList"
+import { greeting, needsReview } from "./lib/progress"
 
 type View = "landing" | "login" | "signup" | "student" | "tutor" | "admin"
 type AuthState = "loading" | "authenticated" | "unauthenticated"
@@ -16,22 +35,6 @@ const useAuth = () => useContext(AuthContext)
 
 type IconProps = { className?: string; size?: number }
 
-const Mic = ({ className = "", size = 24 }: IconProps) => (
-  <svg
-    className={className}
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="8" y="2" width="8" height="13" rx="4" />
-    <path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" />
-  </svg>
-)
 const Arrow = ({ className = "", size = 18 }: IconProps) => (
   <svg
     className={className}
@@ -60,17 +63,6 @@ const Check = ({ className = "", size = 18 }: IconProps) => (
     strokeLinejoin="round"
   >
     <path d="m5 12 4.2 4L19 6.5" />
-  </svg>
-)
-const Play = ({ className = "", size = 18 }: IconProps) => (
-  <svg
-    className={className}
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-  >
-    <path d="m8 5 11 7-11 7V5Z" />
   </svg>
 )
 const Sparkle = ({ className = "", size = 18 }: IconProps) => (
@@ -156,24 +148,6 @@ function LoginLogo() {
       alt="KezSpeak"
       className="h-20 w-36 object-contain"
     />
-  )
-}
-
-function Wave({ light = false }: { light?: boolean }) {
-  const levels = [
-    23, 48, 70, 40, 86, 58, 35, 74, 95, 52, 30, 67, 47, 90, 62, 36, 72, 44,
-  ]
-  return (
-    <div className="flex h-12 items-center gap-1.5">
-      {levels.map((height, i) => (
-        <i
-          key={i}
-          className={`block w-1 rounded-full ${light ? "bg-white/70" : "bg-kez-blue"
-            }`}
-          style={{ height: `${height}%`, opacity: i === 8 ? 1 : undefined }}
-        />
-      ))}
-    </div>
   )
 }
 
@@ -273,6 +247,7 @@ function Landing({
           <a href="#contact">Contact</a>
         </nav>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <button
             onClick={onLogin}
             className="hidden px-4 py-2.5 text-sm font-bold text-kez-blue sm:block"
@@ -340,7 +315,7 @@ function Landing({
                 </span>
               </div>
               <p className="text-sm font-medium text-slate-500">
-                <b className="text-kez-dark">2,000+ learners</b> are finding
+                <b className="text-kez-dark">Kez learners</b> are finding
                 their voice
               </p>
             </div>
@@ -562,6 +537,32 @@ function Login({
     }
   }
 
+  async function forgotPassword() {
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail || !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+      setErrorMsg("Enter your email above, then click “Forgot password?” again.")
+      return
+    }
+    setResending(true)
+    setErrorMsg("")
+    setInfoMsg("")
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: window.location.origin,
+      })
+      if (error && /rate limit/i.test(error.message)) {
+        setErrorMsg("Too many emails were sent recently. Please wait a while and try again.")
+      } else {
+        // Same message either way, so this can't be used to discover accounts.
+        setInfoMsg("If an account exists for that email, a password reset link is on its way.")
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Failed to send the reset email.")
+    } finally {
+      setResending(false)
+    }
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault()
     setErrorMsg("")
@@ -754,7 +755,9 @@ function Login({
                 </label>
                 <button
                   type="button"
-                  className="text-sm font-bold text-kez-blue"
+                  onClick={forgotPassword}
+                  disabled={resending}
+                  className="text-sm font-bold text-kez-blue disabled:opacity-60"
                 >
                   Forgot password?
                 </button>
@@ -1030,572 +1033,66 @@ const studentNav = [
   ["results", "▦", "Results"],
   ["profile", "◉", "Profile"],
 ]
-const skillScores = [
-  ["Pronunciation", 70, "bg-sky-400"],
-  ["Fluency", 65, "bg-amber-400"],
-  ["Grammar", 74, "bg-indigo-400"],
-  ["Vocabulary", 78, "bg-emerald-400"],
-  ["Confidence", 68, "bg-rose-400"],
-]
-
 function StudentApp({ onExit }: { onExit: () => void }) {
   const { profile, signOut } = useAuth()
   const firstName = profile?.full_name?.split(" ")[0] ?? "there"
   const avatarLetter = profile?.full_name?.[0]?.toUpperCase() ?? "?"
   const [page, setPage] = useState("dashboard")
-  const [recording, setRecording] = useState(false)
-  const [done, setDone] = useState(false)
-  const [filter, setFilter] = useState("All")
+  const [taskId, setTaskId] = useState<string | null>(null)
+  const { submissions, error, reload } = useSubmissionList(profile?.id)
+  // Refresh when switching pages so new recordings and feedback show up.
+  useEffect(reload, [page, reload])
+
+  const startTask = (id: string | null) => {
+    setTaskId(id)
+    setPage("activity")
+  }
   const titles: Record<string, string> = {
-    dashboard: `Good morning, ${firstName}! 👋`,
+    dashboard: `${greeting()}, ${firstName}! 👋`,
     assessment: "My Speaking Assessment",
     activities: "Speaking Activities",
-    activity: "Describe Your Weekend",
+    activity: "Speaking Task",
     feedback: "Your Feedback",
     progress: "My Speaking Progress",
-    results: "Your Pre-Assessment Results",
+    results: "My Results",
     profile: "Your Profile",
   }
-  const ScoreBars = () => (
-    <div className="space-y-4">
-      {skillScores.map(([name, score, color]) => (
-        <div key={name}>
-          <div className="mb-1.5 flex justify-between text-sm">
-            <span className="font-semibold text-slate-600">{name}</span>
-            <b>{score}%</b>
-          </div>
-          <div className="h-2.5 rounded-full bg-slate-100">
-            <div
-              className={`h-full rounded-full ${color}`}
-              style={{ width: `${score}%` }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
   return (
-    <div className="flex min-h-screen bg-[#f8fbff] text-kez-dark">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-kez-dark px-3 py-5 text-white lg:flex">
-        <div className="px-3">
-          <Brand dark />
-        </div>
-        <p className="mt-10 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-white/35">
-          My space
-        </p>
-        <nav className="mt-3 space-y-1">
-          {studentNav.map(([id, icon, label]) => (
-            <button
-              key={id}
-              onClick={() => setPage(id)}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${page === id || (id === "activities" && page === "activity")
-                ? "bg-kez-blue text-white"
-                : "text-white/60 hover:bg-white/10 hover:text-white"
-                }`}
-            >
-              <span className="text-lg">{icon}</span>
-              {label}
-            </button>
-          ))}
-        </nav>
-        <div className="mt-auto border-t border-white/10 pt-4">
-          <button className="flex w-full gap-3 rounded-xl px-3 py-3 text-sm text-white/60">
-            ⚙ Settings
-          </button>
-          <button
-            onClick={signOut}
-            className="flex w-full gap-3 rounded-xl px-3 py-3 text-sm text-white/60"
-          >
-            ↪ Log Out
-          </button>
-          <div className="mt-3 flex items-center gap-3 rounded-xl bg-white/8 p-3">
-            <span className="grid size-9 place-items-center rounded-full bg-kez-yellow font-bold text-kez-dark">
-              {avatarLetter}
-            </span>
-            <div>
-              <p className="text-sm font-bold">{profile?.full_name ?? "Student"}</p>
-              <p className="text-[11px] text-white/45">Developing Speaker</p>
-            </div>
-          </div>
-        </div>
-      </aside>
-      <main className="min-w-0 flex-1">
-        <header className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-5 sm:px-10">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[.18em] text-kez-blue">
-              KezSpeak Student
-            </p>
-            <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
-              {titles[page]}
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-full bg-kez-blue-light">
-              🔔
-            </span>
-            <span className="grid size-10 place-items-center rounded-full bg-kez-yellow font-bold">
-              {avatarLetter}
-            </span>
-          </div>
-        </header>
-        <div className="mx-auto max-w-[1240px] p-6 sm:p-10">
-          {page === "dashboard" && (
-            <>
-              <p className="text-slate-500">
-                Let’s see how your English is growing.
-              </p>
-              <section className="mt-8 rounded-3xl bg-kez-blue p-7 text-white">
-                <div className="flex justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-bold tracking-wider text-kez-yellow">
-                      YOUR SPEAKING JOURNEY
-                    </p>
-                    <h2 className="mt-2 text-2xl font-extrabold">
-                      You’re building momentum.
-                    </h2>
-                  </div>
-                  <span className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold">
-                    Stage 2 of 4
-                  </span>
-                </div>
-                <div className="mt-8 grid gap-3 sm:grid-cols-4">
-                  {[
-                    ["✓", "Pre-Assessment", "Completed"],
-                    ["02", "Practice", "In progress"],
-                    ["03", "Post-Assessment", "Up next"],
-                    ["04", "Improvement", "Unlocks soon"],
-                  ].map(([n, label, status], i) => (
-                    <div
-                      key={label}
-                      className={`rounded-2xl p-4 ${i === 1 ? "bg-kez-yellow text-kez-dark" : "bg-white/10"
-                        }`}
-                    >
-                      <b className="font-mono text-xs">{n}</b>
-                      <p className="mt-4 font-bold">{label}</p>
-                      <p className="mt-1 text-xs opacity-70">{status}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-              <div className="mt-6 grid gap-6 xl:grid-cols-2">
-                <section className="rounded-3xl bg-white p-7 shadow-sm">
-                  <div className="flex justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-slate-400">
-                        YOUR SPEAKING ASSESSMENT
-                      </p>
-                      <h2 className="mt-2 text-xl font-extrabold">
-                        Pre-Assessment
-                      </h2>
-                      <p className="mt-3 text-sm font-bold text-green-600">
-                        ✓ Completed
-                      </p>
-                    </div>
-                    <p className="text-3xl font-extrabold text-kez-blue">
-                      72<span className="text-sm text-slate-400"> / 100</span>
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setPage("results")}
-                    className="mt-7 text-sm font-bold text-kez-blue"
-                  >
-                    View Results →
-                  </button>
-                </section>
-                <section className="rounded-3xl bg-kez-yellow-light p-7">
-                  <p className="text-xs font-bold text-amber-700">
-                    TODAY’S SPEAKING PRACTICE
-                  </p>
-                  <h2 className="mt-2 text-xl font-extrabold">
-                    Describe Your Favorite Place
-                  </h2>
-                  <p className="mt-3 text-sm text-amber-900">
-                    Fluency + Vocabulary · 5 minutes
-                  </p>
-                  <button
-                    onClick={() => setPage("activity")}
-                    className="mt-6 rounded-xl bg-kez-dark px-4 py-3 text-sm font-bold text-white"
-                  >
-                    🎤 Start Practice
-                  </button>
-                </section>
-              </div>
-              <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
-                <section className="rounded-3xl bg-white p-7 shadow-sm">
-                  <div className="flex justify-between">
-                    <h2 className="text-lg font-extrabold">
-                      Progress Overview
-                    </h2>
-                    <b className="text-3xl text-kez-blue">72%</b>
-                  </div>
-                  <p className="mb-6 text-sm text-slate-500">
-                    Overall speaking proficiency
-                  </p>
-                  <ScoreBars />
-                </section>
-                <section className="rounded-3xl bg-white p-7 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-10 place-items-center rounded-full bg-pink-100">
-                      👩🏽
-                    </span>
-                    <div>
-                      <p className="font-extrabold">Feedback from Maria</p>
-                      <p className="text-xs text-slate-400">
-                        Your speaking tutor
-                      </p>
-                    </div>
-                  </div>
-                  <p className="mt-5 text-sm leading-7 text-slate-600">
-                    “Your ideas were clear and you used a good range of
-                    vocabulary. Keep practicing sentence pacing.”
-                  </p>
-                  <button
-                    onClick={() => setPage("feedback")}
-                    className="mt-5 text-sm font-bold text-kez-blue"
-                  >
-                    View Feedback →
-                  </button>
-                </section>
-              </div>
-            </>
-          )}
-          {page === "assessment" && (
-            <section className="max-w-4xl">
-              <p className="text-slate-500">
-                Your assessment path makes progress easy to see.
-              </p>
-              <div className="mt-8 space-y-3">
-                {[
-                  ["✓", "Pre-Assessment", "Completed"],
-                  ["02", "Speaking Activities", "In Progress"],
-                  ["🔒", "Post-Assessment", "Not Available Yet"],
-                  ["🔒", "Final Comparison", "Locked"],
-                ].map(([n, name, status], i) => (
-                  <div
-                    key={name}
-                    className="flex items-center gap-5 rounded-2xl bg-white p-5 shadow-sm"
-                  >
-                    <span
-                      className={`grid size-11 place-items-center rounded-full font-bold ${i === 0
-                        ? "bg-green-500 text-white"
-                        : i === 1
-                          ? "bg-kez-blue text-white"
-                          : "bg-slate-100"
-                        }`}
-                    >
-                      {n}
-                    </span>
-                    <div className="flex-1">
-                      <b>{name}</b>
-                      <p className="text-sm text-slate-500">{status}</p>
-                    </div>
-                    {i === 1 && (
-                      <button
-                        onClick={() => setPage("activities")}
-                        className="rounded-lg bg-kez-blue-light px-3 py-2 text-xs font-bold text-kez-blue"
-                      >
-                        Continue
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <p className="mt-7 rounded-2xl bg-kez-yellow-light p-5 text-sm text-amber-900">
-                💡 Complete your speaking activities before taking the
-                post-assessment.
-              </p>
-            </section>
-          )}
-          {page === "activities" && (
-            <>
-              <p className="text-slate-500">
-                Practice your English through meaningful conversations and
-                activities.
-              </p>
-              <div className="mt-7 flex flex-wrap gap-2">
-                {[
-                  "All",
-                  "Conversation",
-                  "Pronunciation",
-                  "Fluency",
-                  "Vocabulary",
-                  "Grammar",
-                  "Storytelling",
-                  "Role Play",
-                ].map((x) => (
-                  <button
-                    key={x}
-                    onClick={() => setFilter(x)}
-                    className={`rounded-full px-4 py-2 text-sm font-bold ${filter === x
-                      ? "bg-kez-blue text-white"
-                      : "bg-white text-slate-500"
-                      }`}
-                  >
-                    {x}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ["Describe Your Weekend", "Fluency", "Intermediate", "5 min"],
-                  [
-                    "Coffee Shop Conversation",
-                    "Conversation",
-                    "Beginner",
-                    "4 min",
-                  ],
-                  ["The TH Sound", "Pronunciation", "Intermediate", "6 min"],
-                  ["A Memorable Day", "Storytelling", "Advanced", "8 min"],
-                ].map(([name, skill, difficulty, time], i) => (
-                  <article
-                    key={name}
-                    className="rounded-3xl bg-white p-5 shadow-sm"
-                  >
-                    <span className="grid size-12 place-items-center rounded-2xl bg-kez-blue-light text-2xl">
-                      {["🎙️", "💭", "👄", "📚"][i]}
-                    </span>
-                    <h2 className="mt-7 font-extrabold">{name}</h2>
-                    <p className="mt-4 text-xs leading-6 text-slate-500">
-                      Skill{" "}
-                      <b className="float-right text-slate-700">{skill}</b>
-                      <br />
-                      Difficulty{" "}
-                      <b className="float-right text-slate-700">{difficulty}</b>
-                      <br />
-                      Duration{" "}
-                      <b className="float-right text-slate-700">{time}</b>
-                    </p>
-                    <button
-                      onClick={() => setPage("activity")}
-                      className="mt-6 w-full rounded-xl bg-kez-blue-light py-3 text-sm font-bold text-kez-blue"
-                    >
-                      Practice
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </>
-          )}
-          {page === "activity" && (
-            <section className="mx-auto max-w-3xl text-center">
-              <p className="text-lg leading-8 text-slate-600">
-                Speak for 60 seconds about what you did last weekend. Try to
-                explain what you enjoyed and why.
-              </p>
-              <div className="mt-8 rounded-[32px] bg-white p-8 shadow-sm">
-                <span className="rounded-full bg-kez-yellow-light px-4 py-2 text-sm font-bold text-amber-800">
-                  60 seconds
-                </span>
-                <div
-                  className={`mx-auto mt-8 grid size-40 place-items-center rounded-full ${recording
-                    ? "bg-red-50 text-red-500 ring-8 ring-red-100"
-                    : "bg-kez-blue text-kez-yellow"
-                    }`}
-                >
-                  <Mic size={58} />
-                </div>
-                {recording ? (
-                  <>
-                    <p className="mt-6 text-3xl font-extrabold">00:42</p>
-                    <div className="mx-auto mt-5 w-fit">
-                      <Wave />
-                    </div>
-                    <div className="mt-7 flex justify-center gap-3">
-                      <button
-                        onClick={() => setRecording(false)}
-                        className="rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold"
-                      >
-                        Pause
-                      </button>
-                      <button
-                        onClick={() => {
-                          setRecording(false)
-                          setDone(true)
-                        }}
-                        className="rounded-xl bg-red-500 px-5 py-3 text-sm font-bold text-white"
-                      >
-                        Stop
-                      </button>
-                    </div>
-                  </>
-                ) : done ? (
-                  <>
-                    <button className="mt-7 rounded-xl bg-kez-blue-light px-5 py-3 text-sm font-bold text-kez-blue">
-                      ▶ Play Recording
-                    </button>
-                    <button
-                      onClick={() => setPage("activities")}
-                      className="mt-4 w-full rounded-xl bg-kez-blue py-4 text-sm font-bold text-white"
-                    >
-                      Submit
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setRecording(true)}
-                    className="mt-7 rounded-xl bg-kez-blue px-6 py-4 text-sm font-bold text-white"
-                  >
-                    🎤 Start Recording
-                  </button>
-                )}
-                <p className="mt-7 text-sm font-semibold text-slate-500">
-                  Speak naturally. Take your time. You’ve got this! 🌟
-                </p>
-              </div>
-            </section>
-          )}
-          {page === "feedback" && (
-            <section className="grid gap-6 xl:grid-cols-[.8fr_1.2fr]">
-              <div className="rounded-3xl bg-kez-blue p-7 text-white">
-                <p className="text-sm font-bold text-kez-yellow">
-                  PRE-ASSESSMENT
-                </p>
-                <p className="mt-7 text-6xl font-extrabold">
-                  72<span className="text-xl text-blue-200"> / 100</span>
-                </p>
-                <p className="mt-2 text-blue-100">Maria Santos · Tutor</p>
-                <div className="mt-8 rounded-2xl bg-white/10 p-4">
-                  <p className="text-sm font-bold">Listen to Recording</p>
-                  <div className="mt-3 flex items-center gap-3">
-                    <button className="grid size-9 place-items-center rounded-full bg-kez-yellow text-kez-dark">
-                      <Play size={14} />
-                    </button>
-                    <Wave light />
-                  </div>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {[
-                  [
-                    "Pronunciation",
-                    "70",
-                    "Your pronunciation is understandable. Practice difficult sounds more consistently.",
-                  ],
-                  [
-                    "Fluency",
-                    "65",
-                    "Try reducing long pauses and maintain a natural speaking rhythm.",
-                  ],
-                  ["Vocabulary", "78", "You use a good variety of words."],
-                  ["Confidence", "68", "Keep practicing spontaneous speaking."],
-                ].map(([name, score, text]) => (
-                  <article
-                    key={name}
-                    className="rounded-3xl bg-white p-6 shadow-sm"
-                  >
-                    <b className="text-2xl text-kez-blue">
-                      {score}
-                      <small className="text-xs text-slate-400"> / 100</small>
-                    </b>
-                    <h2 className="mt-3 font-extrabold">{name}</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      “{text}”
-                    </p>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
-          {(page === "progress" || page === "results") && (
-            <section>
-              <div className="rounded-3xl bg-white p-7 shadow-sm">
-                <div className="flex justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-kez-blue">
-                      {page === "results"
-                        ? "DEVELOPING SPEAKER"
-                        : "SPEAKING PROFICIENCY"}
-                    </p>
-                    <h2 className="mt-1 text-5xl font-extrabold">
-                      72 <span className="text-xl text-slate-400">/ 100</span>
-                    </h2>
-                  </div>
-                  <b className="rounded-full bg-green-50 px-4 py-2 text-sm text-green-700">
-                    +6 points this month
-                  </b>
-                </div>
-                <div className="mt-9 flex h-44 items-end gap-4 border-b border-l border-slate-100 px-6">
-                  {[54, 58, 62, 65, 68, 72].map((n, i) => (
-                    <div
-                      key={n}
-                      className="flex flex-1 flex-col items-center gap-2"
-                    >
-                      <div
-                        className="w-full rounded-t-lg bg-kez-blue"
-                        style={{
-                          height: `${n * 1.7}px`,
-                          opacity: 0.5 + i * 0.1,
-                        }}
-                      />
-                      <span className="text-[10px] text-slate-400">
-                        W{i + 1}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                {skillScores.map(([name, score, color]) => (
-                  <div
-                    key={name}
-                    className="rounded-2xl bg-white p-5 shadow-sm"
-                  >
-                    <p className="text-sm font-bold">{name}</p>
-                    <p className="mt-3 text-2xl font-extrabold">
-                      {score}
-                      <span className="text-xs text-slate-400"> / 100</span>
-                    </p>
-                    <div
-                      className={`mt-4 h-2 rounded-full ${color}`}
-                      style={{ width: `${score}%` }}
-                    />
-                  </div>
-                ))}
-              </div>
-              {page === "results" && (
-                <div className="mt-6 rounded-3xl bg-kez-yellow-light p-7">
-                  <h2 className="text-xl font-extrabold">Tutor Feedback</h2>
-                  <p className="mt-3 max-w-2xl leading-7 text-amber-950">
-                    “Your communication is clear, and you demonstrate good
-                    vocabulary. Focus on fluency and pronunciation to make your
-                    speaking more natural.”
-                  </p>
-                  <button
-                    onClick={() => setPage("activities")}
-                    className="mt-6 rounded-xl bg-kez-dark px-5 py-3 text-sm font-bold text-white"
-                  >
-                    Start Speaking Activities
-                  </button>
-                </div>
-              )}
-            </section>
-          )}
-          {page === "profile" && (
-            <section className="max-w-xl rounded-3xl bg-white p-8 shadow-sm">
-              <span className="grid size-20 place-items-center rounded-full bg-kez-yellow text-3xl font-bold">
-                J
-              </span>
-              <h2 className="mt-5 text-2xl font-extrabold">Jamie Carter</h2>
-              <p className="text-slate-500">jamie.carter@example.com</p>
-              <div className="mt-8 grid grid-cols-2 gap-4">
-                <div className="rounded-2xl bg-kez-blue-light p-4">
-                  <p className="text-xs font-bold text-kez-blue">
-                    CURRENT LEVEL
-                  </p>
-                  <p className="mt-2 font-extrabold">Developing Speaker</p>
-                </div>
-                <div className="rounded-2xl bg-kez-yellow-light p-4">
-                  <p className="text-xs font-bold text-amber-800">
-                    PRACTICE TIME
-                  </p>
-                  <p className="mt-2 font-extrabold">2h 45m</p>
-                </div>
-              </div>
-            </section>
-          )}
-        </div>
-      </main>
-    </div>
+    <DashboardLayout
+      brand={<Brand dark />}
+      workspaceLabel="My space"
+      eyebrow="KezSpeak Student"
+      title={titles[page]}
+      nav={studentNav as NavItem[]}
+      isActive={(id) => page === id || (id === "activities" && page === "activity")}
+      onNavigate={setPage}
+      userName={profile?.full_name ?? "Student"}
+      userSubtitle="Learner"
+      avatarLetter={avatarLetter}
+      onSignOut={signOut}
+    >
+      <div className="mx-auto max-w-[1240px] p-4 sm:p-6 lg:p-10">
+        {page === "dashboard" && (
+          <StudentDashboard submissions={submissions} error={error} onNavigate={setPage} onStartTask={startTask} />
+        )}
+        {page === "assessment" && (
+          <AssessmentPath submissions={submissions} error={error} onNavigate={setPage} onStartTask={startTask} />
+        )}
+        {page === "activities" && <TaskCatalog onStart={startTask} />}
+        {page === "activity" && profile && (
+          <RecordActivity
+            key={taskId ?? "default"}
+            learnerId={profile.id}
+            initialTaskId={taskId}
+            onViewResults={() => setPage("results")}
+          />
+        )}
+        {(page === "feedback" || page === "progress" || page === "results") && profile && (
+          <AssessmentResults learnerId={profile.id} onRecord={() => startTask(null)} />
+        )}
+        {page === "profile" && profile && <ProfileCard profile={profile} submissions={submissions} />}
+      </div>
+    </DashboardLayout>
   )
 }
 
@@ -1604,10 +1101,22 @@ function TutorApp({ onExit }: { onExit: () => void }) {
   const firstName = profile?.full_name?.split(" ")[0] ?? "there"
   const avatarLetter = profile?.full_name?.[0]?.toUpperCase() ?? "?"
   const [page, setPage] = useState("dashboard")
-  const [reviewed, setReviewed] = useState(false)
-  const [tab, setTab] = useState("Pre-Assessment")
+  const [reviewId, setReviewId] = useState<string | null>(null)
+  const [learnerId, setLearnerId] = useState<string | null>(null)
+  const isSuperAdmin = profile?.role === "super_admin"
+  const { submissions, error, reload } = useSubmissionList()
+  useEffect(reload, [page, reload])
+  const pendingCount = submissions?.filter(needsReview).length ?? 0
+
   const nav = [
     ["dashboard", "⌂", "Dashboard"],
+    ...(isSuperAdmin
+      ? [
+          ["users", "🛡", "Users"],
+          ["assignments", "🔗", "Assignments"],
+          ["tasks", "📝", "Tasks"],
+        ]
+      : []),
     ["learners", "👥", "Learners"],
     ["submissions", "🎤", "Assessments"],
     ["activities", "🗣", "Speaking Activities"],
@@ -1617,489 +1126,73 @@ function TutorApp({ onExit }: { onExit: () => void }) {
     ["reports", "▦", "Reports"],
     ["profile", "◉", "Profile"],
   ]
-  const scores: [string, number, number][] = [
-    ["Pronunciation", 70, 84],
-    ["Fluency", 65, 82],
-    ["Grammar", 74, 86],
-    ["Vocabulary", 78, 89],
-    ["Confidence", 68, 87],
-  ]
   const titles: Record<string, string> = {
-    dashboard: `Good morning, ${firstName}! 👋`,
+    dashboard: `${greeting()}, ${firstName}! 👋`,
+    users: "User Accounts",
+    assignments: "Tutor Assignments",
+    tasks: "Speaking Tasks",
     learners: "My Learners",
     submissions: "Assessment Submissions",
+    activities: "Speaking Activities",
     review: "Speaking Assessment Review",
     feedback: "Feedback",
     progress: "Speaking Progress Comparison",
     reports: "Learner Reports",
-    profile: "Maria Santos",
+    profile: "Your Profile",
   }
-  const pending = [
-    ["Jamie Cruz", "Speaking Pre-Assessment", "Today, 10:42 AM"],
-    ["Alex Santos", "Speaking Activity", "Today, 9:16 AM"],
-    ["Sophia Reyes", "Post-Assessment", "Yesterday, 4:30 PM"],
-    ["Daniel Lim", "Speaking Practice", "Yesterday, 2:14 PM"],
-  ]
+  const navigate = (next: string) => {
+    if (next !== page) setReviewId(null)
+    setPage(next)
+  }
   return (
-    <div className="flex min-h-screen bg-[#f8fbff] text-kez-dark">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-kez-dark px-3 py-5 text-white lg:flex">
-        <div className="px-3">
-          <Brand dark />
-        </div>
-        <p className="mt-10 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-white/35">
-          Tutor workspace
-        </p>
-        <nav className="mt-3 space-y-1">
-          {nav.map(([id, icon, label]) => (
-            <button
-              onClick={() => setPage(id)}
-              key={id}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${page === id
-                ? "bg-kez-blue text-white"
-                : "text-white/60 hover:bg-white/10 hover:text-white"
-                }`}
-            >
-              <span className="text-lg">{icon}</span>
-              {label}
-              {id === "review" && (
-                <b className="ml-auto rounded-full bg-kez-yellow px-2 py-0.5 text-[10px] text-kez-dark">
-                  12
-                </b>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="mt-auto border-t border-white/10 pt-4">
-          <button className="flex w-full gap-3 px-3 py-3 text-sm text-white/60">
-            ⚙ Settings
-          </button>
-          <button
-            onClick={signOut}
-            className="flex w-full gap-3 px-3 py-3 text-sm text-white/60"
-          >
-            ↪ Log Out
-          </button>
-          <div className="mt-3 flex items-center gap-3 rounded-xl bg-white/8 p-3">
-            <span className="grid size-9 place-items-center rounded-full bg-kez-yellow font-bold text-kez-dark">
-              {avatarLetter}
-            </span>
-            <div>
-              <p className="text-sm font-bold">{profile?.full_name ?? "Tutor"}</p>
-              <p className="text-[11px] text-white/45">Tutor & Assessor</p>
-            </div>
-          </div>
-        </div>
-      </aside>
-      <main className="min-w-0 flex-1">
-        <header className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-5 sm:px-10">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[.18em] text-kez-blue">
-              KezSpeak Tutor
-            </p>
-            <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">
-              {titles[page] || "Speaking Activities"}
-            </h1>
-          </div>
-          <div className="flex gap-3">
-            <span className="grid size-10 place-items-center rounded-full bg-kez-blue-light">
-              🔔
-            </span>
-            <span className="grid size-10 place-items-center rounded-full bg-kez-yellow font-bold text-kez-dark">
-              {avatarLetter}
-            </span>
-          </div>
-        </header>
-        <div className="mx-auto max-w-[1280px] p-6 sm:p-10">
-          {page === "dashboard" && (
-            <>
-              <p className="text-slate-500">
-                Here’s how your learners are progressing.
-              </p>
-              <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ["👥", "Active Learners", "48", "bg-kez-blue-light"],
-                  ["🎧", "Pending Evaluations", "12", "bg-kez-yellow-light"],
-                  ["✓", "Assessments Completed", "96", "bg-green-50"],
-                  ["↗", "Average Improvement", "+13 points", "bg-pink-50"],
-                ].map(([icon, label, value, bg]) => (
-                  <div key={label} className={`rounded-3xl p-6 ${bg}`}>
-                    <span className="text-2xl">{icon}</span>
-                    <p className="mt-6 text-sm font-semibold text-slate-600">
-                      {label}
-                    </p>
-                    <p className="mt-1 text-3xl font-extrabold">{value}</p>
-                  </div>
-                ))}
-              </div>
-              <section className="mt-7 rounded-3xl bg-white p-7 shadow-sm">
-                <div className="flex justify-between">
-                  <div>
-                    <h2 className="text-xl font-extrabold">
-                      Needs Your Attention
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Submissions waiting for your expert feedback.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setPage("review")}
-                    className="text-sm font-bold text-kez-blue"
-                  >
-                    View all →
-                  </button>
-                </div>
-                <div className="mt-6 grid gap-3">
-                  {pending.map(([name, type, time]) => (
-                    <div
-                      key={name}
-                      className="flex flex-wrap items-center gap-4 rounded-2xl bg-slate-50 p-4"
-                    >
-                      <span className="grid size-10 place-items-center rounded-full bg-blue-100 font-bold text-kez-blue">
-                        {name[0]}
-                      </span>
-                      <div className="min-w-40 flex-1">
-                        <p className="font-bold">{name}</p>
-                        <p className="text-xs text-slate-500">{type}</p>
-                      </div>
-                      <p className="text-xs text-slate-500">Submitted {time}</p>
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
-                        Pending review
-                      </span>
-                      <button
-                        onClick={() => setPage("review")}
-                        className="rounded-lg bg-kez-blue px-4 py-2 text-xs font-bold text-white"
-                      >
-                        Review
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </>
-          )}
-          {page === "learners" && (
-            <>
-              <p className="text-slate-500">
-                Monitor speaking performance and provide targeted feedback.
-              </p>
-              <div className="mt-7 flex flex-wrap gap-3">
-                <input
-                  placeholder="Search learners..."
-                  className="h-11 w-72 rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-kez-blue"
-                />
-                {["All", "Improving", "Needs Attention", "Completed"].map(
-                  (x, i) => (
-                    <button
-                      key={x}
-                      className={`rounded-xl px-4 text-sm font-bold ${i === 0
-                        ? "bg-kez-blue text-white"
-                        : "bg-white text-slate-500"
-                        }`}
-                    >
-                      {x}
-                    </button>
-                  ),
-                )}
-              </div>
-              <div className="mt-6 overflow-x-auto rounded-3xl bg-white shadow-sm">
-                <table className="w-full min-w-[780px] text-left text-sm">
-                  <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-400">
-                    <tr>
-                      {[
-                        "Learner",
-                        "Pre-Assessment",
-                        "Post-Assessment",
-                        "Improvement",
-                        "Last Activity",
-                        "Status",
-                        "Action",
-                      ].map((x) => (
-                        <th className="px-6 py-5" key={x}>
-                          {x}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      ["Jamie Cruz", "72", "86", "+14", "Today", "Improving"],
-                      ["Alex Santos", "68", "76", "+8", "Today", "Improving"],
-                      [
-                        "Sophia Reyes",
-                        "81",
-                        "—",
-                        "—",
-                        "Yesterday",
-                        "Needs review",
-                      ],
-                      ["Daniel Lim", "62", "74", "+12", "Sep 10", "Improving"],
-                    ].map((row) => (
-                      <tr key={row[0]} className="border-b border-slate-50">
-                        <td className="px-6 py-5 font-bold">{row[0]}</td>
-                        {row.slice(1, 5).map((x, index) => (
-                          <td key={`${row[0]}-${index}`} className="px-6 py-5 text-slate-600">
-                            {x}
-                          </td>
-                        ))}
-                        <td className="px-6 py-5">
-                          <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
-                            {row[5]}
-                          </span>
-                        </td>
-                        <td className="px-6 py-5">
-                          <button
-                            onClick={() => setPage("progress")}
-                            className="font-bold text-kez-blue"
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-          {(page === "submissions" || page === "review") && (
-            <>
-              {page === "submissions" ? (
-                <>
-                  <div className="mt-5 flex gap-2">
-                    {[
-                      "Pre-Assessment",
-                      "Post-Assessment",
-                      "Speaking Activities",
-                    ].map((x) => (
-                      <button
-                        onClick={() => setTab(x)}
-                        key={x}
-                        className={`rounded-xl px-4 py-2 text-sm font-bold ${tab === x
-                          ? "bg-kez-blue text-white"
-                          : "bg-white text-slate-500"
-                          }`}
-                      >
-                        {x}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-6 rounded-3xl bg-white p-6 shadow-sm">
-                    {pending.map(([name, type, time]) => (
-                      <div
-                        className="flex items-center justify-between border-b border-slate-100 py-4 last:border-0"
-                        key={name}
-                      >
-                        <div>
-                          <p className="font-bold">{name}</p>
-                          <p className="text-sm text-slate-500">
-                            {type} · {time}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-5">
-                          <span className="text-sm font-bold text-amber-600">
-                            Pending
-                          </span>
-                          <button
-                            onClick={() => setPage("review")}
-                            className="rounded-lg bg-kez-blue px-4 py-2 text-sm font-bold text-white"
-                          >
-                            Review
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <section className="grid gap-6 xl:grid-cols-[.8fr_1.2fr_.9fr]">
-                  <div className="rounded-3xl bg-white p-6 shadow-sm">
-                    <span className="grid size-14 place-items-center rounded-full bg-blue-100 text-xl">
-                      J
-                    </span>
-                    <h2 className="mt-4 text-xl font-extrabold">Jamie Cruz</h2>
-                    <p className="text-sm text-slate-500">
-                      Intermediate Speaker
-                    </p>
-                    <div className="mt-7 space-y-4 text-sm">
-                      <p>
-                        Assessment type{" "}
-                        <b className="float-right">Post-Assessment</b>
-                      </p>
-                      <p>
-                        Date submitted{" "}
-                        <b className="float-right">Sept 12, 2026</b>
-                      </p>
-                      <p>
-                        Previous score{" "}
-                        <b className="float-right text-kez-blue">72 / 100</b>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="rounded-3xl bg-white p-6 shadow-sm">
-                    <h2 className="font-extrabold">Jamie’s Recording</h2>
-                    <div className="mt-5 rounded-2xl bg-kez-blue p-5 text-white">
-                      <div className="flex items-center gap-4">
-                        <button className="grid size-11 place-items-center rounded-full bg-kez-yellow text-kez-dark">
-                          <Play size={17} />
-                        </button>
-                        <div className="flex-1">
-                          <Wave light />
-                          <div className="flex justify-between text-[10px] text-blue-100">
-                            <span>0:00</span>
-                            <span>1:02</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <h3 className="mt-7 font-extrabold">Transcript</h3>
-                    <p className="mt-3 text-sm leading-7 text-slate-600">
-                      “Last weekend, I went to the coast with my family. What I
-                      enjoyed most was walking along the beach in the early
-                      morning because it was quiet and beautiful…”
-                    </p>
-                  </div>
-                  <div className="rounded-3xl bg-white p-6 shadow-sm">
-                    <h2 className="font-extrabold">Speaking Evaluation</h2>
-                    <div className="mt-5 space-y-4">
-                      {scores.map(([name, pre, post]) => (
-                        <div key={name}>
-                          <div className="flex justify-between text-sm">
-                            <b>{name}</b>
-                            <span className="font-bold text-kez-blue">
-                              {post} / 100
-                            </span>
-                          </div>
-                          <input
-                            type="range"
-                            defaultValue={post}
-                            className="mt-2 w-full accent-kez-blue"
-                          />
-                          <input
-                            placeholder="Add a comment…"
-                            className="mt-2 w-full border-b border-slate-200 pb-2 text-xs outline-none"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-6 rounded-2xl bg-kez-yellow-light p-4">
-                      <p className="text-xs font-bold text-amber-800">
-                        OVERALL SCORE
-                      </p>
-                      <p className="text-3xl font-extrabold">86 / 100</p>
-                    </div>
-                    <textarea
-                      placeholder="Write constructive feedback for the learner..."
-                      className="mt-5 h-20 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-kez-blue"
-                    />
-                    <div className="mt-4 flex gap-2">
-                      <button className="rounded-xl bg-slate-100 px-3 py-3 text-xs font-bold">
-                        Save Draft
-                      </button>
-                      <button
-                        onClick={() => setReviewed(true)}
-                        className="rounded-xl bg-kez-blue px-3 py-3 text-xs font-bold text-white"
-                      >
-                        Submit Evaluation
-                      </button>
-                    </div>
-                    {reviewed && (
-                      <p className="mt-4 rounded-xl bg-green-50 p-3 text-xs font-bold text-green-700">
-                        ✓ Evaluation submitted! Feedback is now available to the
-                        learner.
-                      </p>
-                    )}
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-          {(page === "progress" ||
-            page === "reports" ||
-            page === "feedback") && (
-              <section>
-                <div className="rounded-3xl bg-kez-blue p-8 text-white">
-                  <p className="text-sm font-bold text-kez-yellow">
-                    JAMIE CRUZ · SPEAKING PROGRESS
-                  </p>
-                  <div className="mt-5 flex flex-wrap items-center gap-7">
-                    <div>
-                      <p className="text-xs text-blue-200">PRE-ASSESSMENT</p>
-                      <p className="text-5xl font-extrabold">72</p>
-                    </div>
-                    <span className="text-3xl text-kez-yellow">→</span>
-                    <div>
-                      <p className="text-xs text-blue-200">POST-ASSESSMENT</p>
-                      <p className="text-5xl font-extrabold">86</p>
-                    </div>
-                    <div className="rounded-2xl bg-kez-yellow p-4 text-kez-dark">
-                      <p className="text-xs font-bold">IMPROVEMENT</p>
-                      <p className="text-2xl font-extrabold">+14 points</p>
-                      <p className="text-xs">19.4% improvement</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
-                  <div className="rounded-3xl bg-white p-7 shadow-sm">
-                    <h2 className="font-extrabold">Skill Comparison</h2>
-                    <div className="mt-5 space-y-5">
-                      {scores.map(([name, pre, post]) => (
-                        <div
-                          key={name}
-                          className="grid grid-cols-[1fr_50px_50px_60px] items-center gap-3 text-sm"
-                        >
-                          <b>{name}</b>
-                          <span className="rounded-lg bg-slate-100 p-2 text-center">
-                            {pre}
-                          </span>
-                          <span className="rounded-lg bg-kez-blue-light p-2 text-center font-bold text-kez-blue">
-                            {post}
-                          </span>
-                          <span className="font-bold text-green-600">
-                            +{post - pre}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-3xl bg-kez-yellow-light p-7">
-                    <p className="text-sm font-bold text-amber-800">
-                      GREATEST IMPROVEMENT
-                    </p>
-                    <h2 className="mt-4 text-2xl font-extrabold">
-                      🎤 Confidence
-                    </h2>
-                    <p className="mt-1 text-4xl font-extrabold">
-                      +19 <span className="text-lg">points</span>
-                    </p>
-                    <textarea
-                      defaultValue="Jamie demonstrates noticeable improvement in fluency, confidence, and pronunciation after completing the speaking activities."
-                      className="mt-7 h-28 w-full rounded-xl border border-amber-200 bg-white/70 p-3 text-sm"
-                    />
-                    <button className="mt-4 rounded-xl bg-kez-dark px-4 py-3 text-sm font-bold text-white">
-                      Save Progress Report
-                    </button>
-                  </div>
-                </div>
-              </section>
-            )}
-          {page === "profile" && (
-            <section className="max-w-xl rounded-3xl bg-white p-8 shadow-sm">
-              <span className="text-5xl">👩🏽</span>
-              <h2 className="mt-4 text-2xl font-extrabold">Maria Santos</h2>
-              <p className="text-slate-500">Tutor & Speaking Assessor</p>
-              <div className="mt-7 rounded-2xl bg-kez-blue-light p-5">
-                <p className="text-sm font-bold text-kez-blue">
-                  48 active learners
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  Supporting confidence through focused, kind feedback.
-                </p>
-              </div>
-            </section>
-          )}
-        </div>
-      </main>
-    </div>
+    <DashboardLayout
+      brand={<Brand dark />}
+      workspaceLabel={isSuperAdmin ? "Super admin workspace" : "Tutor workspace"}
+      eyebrow="KezSpeak Tutor"
+      title={titles[page]}
+      nav={nav as NavItem[]}
+      isActive={(id) => page === id}
+      onNavigate={navigate}
+      badges={pendingCount ? { review: String(pendingCount) } : undefined}
+      userName={profile?.full_name ?? "Tutor"}
+      userSubtitle={isSuperAdmin ? "Super Admin" : "Tutor & Assessor"}
+      avatarLetter={avatarLetter}
+      onSignOut={signOut}
+    >
+      <div className="mx-auto max-w-[1280px] p-4 sm:p-6 lg:p-10">
+        {page === "dashboard" && (
+          <TutorDashboard
+            submissions={submissions}
+            error={error}
+            onReview={(id) => {
+              setReviewId(id)
+              setPage("review")
+            }}
+          />
+        )}
+        {page === "learners" && (
+          <LearnerOverview
+            submissions={submissions}
+            error={error}
+            onOpen={(id) => {
+              setLearnerId(id)
+              setPage("progress")
+            }}
+          />
+        )}
+        {(page === "submissions" || page === "review" || page === "feedback") && profile && (
+          <SubmissionReview key={`${page}-${reviewId}`} tutorId={profile.id} initialSelectedId={reviewId} onChanged={reload} />
+        )}
+        {page === "activities" && <TaskCatalog />}
+        {isSuperAdmin && page === "users" && profile && <UserManagement currentUserId={profile.id} />}
+        {isSuperAdmin && page === "assignments" && <AssignmentManagement />}
+        {isSuperAdmin && page === "tasks" && <TaskManagement />}
+        {(page === "progress" || page === "reports") && (
+          <LearnerProgress submissions={submissions} error={error} learnerId={learnerId} onSelect={setLearnerId} />
+        )}
+        {page === "profile" && profile && <ProfileCard profile={profile} submissions={submissions} />}
+      </div>
+    </DashboardLayout>
   )
 }
 
@@ -2108,6 +1201,8 @@ export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [view, setView] = useState<View>("landing")
   const [noProfile, setNoProfile] = useState(false)
+  // Arrived from an invite or password-reset email: choose a password first.
+  const [mustSetPassword, setMustSetPassword] = useState(arrivedToSetPassword)
   const [authBanner, setAuthBanner] = useState<{
     type: "error" | "info" | "success"
     message: string
@@ -2151,30 +1246,38 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[KezSpeak] Auth event:", event, "user:", session?.user?.id ?? null)
+      if (event === "PASSWORD_RECOVERY") setMustSetPassword(true)
       if (session?.user) {
         try {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .maybeSingle()
+          const lookup = () =>
+            supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle()
+          let { data, error } = await lookup()
+          if (!data && !error) {
+            // A brand-new account's profile is created by a database trigger;
+            // give it a moment before falling back.
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+            ;({ data, error } = await lookup())
+          }
 
           console.log("[KezSpeak] Profile lookup — data:", data, "error:", error?.message ?? null)
 
           if (data) {
             const role = (data.role as Profile["role"]) || "student"
+            const isAdmin = role === "admin" || role === "super_admin"
             console.log(
               "[KezSpeak] Detected role:",
               role,
               "→ redirecting to",
-              role === "tutor" ? "/tutor" : role === "admin" ? "/admin" : "/student"
+              role === "tutor" ? "/tutor" : isAdmin ? "/admin" : "/student"
             )
             setProfile(data as Profile)
             setAuthState("authenticated")
             setNoProfile(false)
-            setView(role === "tutor" ? "tutor" : role === "admin" ? "admin" : "student")
+            setView(role === "tutor" ? "tutor" : isAdmin ? "admin" : "student")
           } else {
-            console.warn("[KezSpeak] No database profile found — using fallback profile")
+            console.warn(
+              "[KezSpeak] No database profile found — using a temporary fallback. Saving recordings will fail until a profiles row exists (see migration 20261027_profile_on_signup.sql)."
+            )
             const fallbackProfile: Profile = {
               id: session.user.id,
               full_name:
@@ -2225,6 +1328,15 @@ export default function App() {
     return <NoProfileScreen onSignOut={signOut} />
 
   const authValue = { profile, signOut }
+
+  if (authState === "authenticated" && mustSetPassword)
+    return (
+      <SetPasswordScreen
+        name={profile?.full_name?.split(" ")[0] ?? "there"}
+        invited={arrivedFromInvite}
+        onDone={() => setMustSetPassword(false)}
+      />
+    )
 
   if (authState === "authenticated") {
     if (view === "tutor")
