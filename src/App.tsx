@@ -1,4 +1,4 @@
-import { type ComponentType, FormEvent, createContext, useContext, useEffect, useState } from "react"
+import { type ComponentType, FormEvent, createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { type User as AuthUser } from "@supabase/supabase-js"
 import {
   AlertCircle,
@@ -7,6 +7,8 @@ import {
   BookOpen,
   CheckCircle2,
   ClipboardCheck,
+  Eye,
+  EyeOff,
   Headphones,
   LayoutDashboard,
   Lightbulb,
@@ -535,9 +537,11 @@ function Landing({
 function Login({
   onBack,
   onSignup,
+  onForgotPassword,
 }: {
   onBack: () => void
   onSignup: () => void
+  onForgotPassword: () => void
 }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -706,6 +710,7 @@ function Login({
                   </label>
                   <button
                     type="button"
+                    onClick={onForgotPassword}
                     className="text-sm font-bold text-kez-blue"
                   >
                     Forgot password?
@@ -734,6 +739,158 @@ function Login({
           </div>
         </div>
       </section>
+    </div>
+  )
+}
+
+function PasswordRecovery({
+  mode,
+  authorized = false,
+  status = "invalid",
+  onLogin,
+  onUpdated,
+  onRequestReset,
+}: {
+  mode: "request" | "update"
+  authorized?: boolean
+  status?: "checking" | "ready" | "invalid" | "updated"
+  onLogin: () => void
+  onUpdated?: () => void
+  onRequestReset?: () => void
+}) {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    if (loading) return
+    setError("")
+    setMessage("")
+    if (mode === "request") {
+      if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
+        setError("Please enter a valid email address.")
+        return
+      }
+      setLoading(true)
+      try {
+        const { error: requestError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/reset-password`,
+        })
+        if (requestError) {
+          setError("We couldn't process your request right now. Please check your connection and try again.")
+          return
+        }
+        setSent(true)
+        setMessage("If an account exists for this email address, a password reset link will be sent. Please check your inbox and spam folder.")
+      } catch {
+        setError("We couldn't connect to the account service. Check your connection and try again.")
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    if (!authorized) {
+      setError("Open the password reset link from your email to continue. The link may have expired; you can request another one.")
+      return
+    }
+    if (!password || !confirmPassword) {
+      setError("Please fill in both password fields.")
+      return
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.")
+      return
+    }
+    if (password !== confirmPassword) {
+      setError("Your passwords don't match.")
+      return
+    }
+    setLoading(true)
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password })
+      if (updateError) {
+        setError("We couldn't update your password. Your reset link may have expired; request a new one and try again.")
+        return
+      }
+      setMessage("Your password has been updated. You can now log in with your new password.")
+      onUpdated?.()
+    } catch {
+      setError("We couldn't connect to the account service. Check your connection and try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 px-5 py-10">
+      <div className="mx-auto max-w-md rounded-3xl bg-white p-8 shadow-xl shadow-slate-900/5 sm:p-10">
+        <LoginLogo />
+        <h1 className="mt-8 text-2xl font-extrabold text-kez-dark">
+          {mode === "request" ? "Forgot your password?" : "Choose a new password"}
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          {mode === "request"
+            ? "Enter the email address on your account and we'll send you a reset link."
+            : "Enter and confirm a new password for your KezSpeak account."}
+        </p>
+        <form onSubmit={submit} className="mt-7">
+          {mode === "request" ? (
+            <label className="block text-sm font-semibold text-slate-700">
+              Email address
+              <input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-4 outline-none focus:border-kez-blue" />
+            </label>
+          ) : status === "checking" ? (
+            <div role="status" className="rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+              <span className="mr-3 inline-block size-4 animate-spin rounded-full border-2 border-blue-300 border-t-kez-blue align-middle" />
+              Checking your password reset link...
+            </div>
+          ) : !authorized ? (
+            <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+              This password reset link is invalid or may have expired. Return to Forgot Password and request a new link.
+            </p>
+          ) : (
+            <>
+              <label className="block text-sm font-semibold text-slate-700">
+                New password
+                <span className="relative mt-2 block">
+                  <input type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 w-full rounded-xl border border-slate-200 px-4 pr-12 outline-none focus:border-kez-blue" />
+                  <button type="button" onClick={() => setShowPassword((shown) => !shown)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-3 text-slate-500">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                </span>
+              </label>
+              <label className="mt-5 block text-sm font-semibold text-slate-700">
+                Confirm new password
+                <span className="relative mt-2 block">
+                  <input type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="h-12 w-full rounded-xl border border-slate-200 px-4 pr-12 outline-none focus:border-kez-blue" />
+                  <button type="button" onClick={() => setShowConfirmPassword((shown) => !shown)} aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"} className="absolute inset-y-0 right-3 text-slate-500">{showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                </span>
+              </label>
+            </>
+          )}
+          {error && <p role="alert" className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
+          {message && <p role="status" className="mt-3 text-sm font-semibold text-emerald-700">{message}</p>}
+          {!sent && !(mode === "update" && message) && (mode === "request" || authorized) && (
+            <button disabled={loading} className="mt-7 flex h-13 w-full items-center justify-center rounded-xl bg-kez-blue text-sm font-bold text-white shadow-lg shadow-blue-900/15 transition hover:bg-blue-800 disabled:opacity-75">
+              {loading ? "Please wait..." : mode === "request" ? "Send reset link" : "Update password"}
+            </button>
+          )}
+          <button type="button" onClick={onLogin} className="mt-6 w-full text-center text-sm font-bold text-kez-blue">
+            Back to log in
+          </button>
+          {mode === "update" && status === "invalid" && onRequestReset && (
+            <button type="button" onClick={onRequestReset} className="mt-3 w-full text-center text-sm font-semibold text-slate-600">
+              Request another reset link
+            </button>
+          )}
+        </form>
+      </div>
     </div>
   )
 }
@@ -2162,6 +2319,10 @@ export default function App() {
   const [view, setView] = useState<View>("landing")
   const [noProfile, setNoProfile] = useState(false)
   const [path, setPath] = useState(() => window.location.pathname)
+  const [recoveryStatus, setRecoveryStatus] = useState<"checking" | "ready" | "invalid" | "updated">(
+    () => window.location.pathname === "/reset-password" ? "checking" : "invalid",
+  )
+  const recoveryEventSeen = useRef(false)
 
   const navigate = (nextPath: string, replace = false) => {
     if (window.location.pathname !== nextPath) window.history[replace ? "replaceState" : "pushState"]({}, "", nextPath)
@@ -2171,6 +2332,7 @@ export default function App() {
   const signOut = async () => {
     console.log("[KezSpeak] Signing out")
     await supabase.auth.signOut()
+    setRecoveryStatus("invalid")
     setUser(null)
     setProfile(null)
     setAuthState("unauthenticated")
@@ -2179,10 +2341,21 @@ export default function App() {
     navigate("/login", true)
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log("[KezSpeak] Auth event:", event, "user:", session?.user?.id ?? null)
+        if (event === "PASSWORD_RECOVERY") {
+          recoveryEventSeen.current = true
+          setRecoveryStatus(session?.access_token && session.user ? "ready" : "invalid")
+          setPath("/reset-password")
+        } else if (
+          event === "INITIAL_SESSION" &&
+          window.location.pathname === "/reset-password" &&
+          !recoveryEventSeen.current
+        ) {
+          setRecoveryStatus("invalid")
+        }
         window.setTimeout(() => {
           void (async () => {
         const { data: { user: authenticatedUser } } = await supabase.auth.getUser()
@@ -2265,6 +2438,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (path === "/reset-password") return
     if (authState === "authenticated" && profile) {
       const ownPath = `/${profile.role}`
       if (path !== ownPath) navigate(ownPath, true)
@@ -2276,6 +2450,19 @@ export default function App() {
   }, [authState, noProfile, path, profile])
 
   if (authState === "loading") return <LoadingScreen />
+
+  if (path === "/reset-password" || recoveryStatus === "ready" || recoveryStatus === "updated") {
+    return (
+      <PasswordRecovery
+        mode="update"
+        authorized={recoveryStatus === "ready" || recoveryStatus === "updated"}
+        status={recoveryStatus}
+        onLogin={() => void signOut()}
+        onUpdated={() => setRecoveryStatus("updated")}
+        onRequestReset={() => navigate("/forgot-password")}
+      />
+    )
+  }
 
   if (noProfile)
     return <NoProfileScreen onSignOut={signOut} />
@@ -2307,8 +2494,12 @@ export default function App() {
       <Login
         onBack={() => navigate("/")}
         onSignup={() => navigate("/signup")}
+        onForgotPassword={() => navigate("/forgot-password")}
       />
     )
+  }
+  if (path === "/forgot-password") {
+    return <PasswordRecovery mode="request" onLogin={() => navigate("/login")} />
   }
   if (path === "/signup") {
     return (

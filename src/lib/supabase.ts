@@ -8,6 +8,17 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || publicAnonKey
 export const supabase = createClient(
   supabaseUrl,
   supabaseAnonKey,
+  {
+    auth: {
+      // Supabase detects and exchanges PKCE callback codes during initialization.
+      // Keep the existing implicit flow for the app's current fragment callbacks.
+      flowType:
+        typeof window !== "undefined" && new URLSearchParams(window.location.search).has("code")
+          ? "pkce"
+          : "implicit",
+      detectSessionInUrl: true,
+    },
+  },
 )
 
 export type Profile = {
