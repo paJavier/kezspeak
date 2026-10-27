@@ -3,6 +3,7 @@ import { type User as AuthUser } from "@supabase/supabase-js"
 import {
   AlertCircle,
   BarChart3,
+  Bell,
   ClipboardCheck,
   Eye,
   EyeOff,
@@ -26,6 +27,8 @@ import AssessmentResults from "./components/student/AssessmentResults"
 import RecordActivity from "./components/student/RecordActivity"
 import SubmissionReview from "./components/tutor/SubmissionReview"
 import DashboardLayout, { type NavItem } from "./components/DashboardLayout"
+import NotificationsPage from "./components/notifications/NotificationsPage"
+import type { NotificationRole } from "./lib/notifications"
 import AssignmentManagement from "./components/admin/AssignmentManagement"
 import TaskManagement from "./components/admin/TaskManagement"
 import UserManagement from "./components/admin/UserManagement"
@@ -512,6 +515,7 @@ function Login({
 }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
   const [infoMsg, setInfoMsg] = useState("")
   const [loading, setLoading] = useState(false)
@@ -696,19 +700,30 @@ function Login({
                 </label>
                 <label className="mt-5 block text-sm font-bold text-kez-dark">
                   Password
-                  <input
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value)
-                      setErrorMsg("")
-                    }}
-                    type="password"
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    className={`mt-2 h-13 w-full rounded-xl border bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100 ${
-                      errorMsg ? "border-red-400" : "border-slate-200"
-                    }`}
-                  />
+                  <span className="relative mt-2 block">
+                    <input
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value)
+                        setErrorMsg("")
+                      }}
+                      type={passwordVisible ? "text" : "password"}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      className={`h-13 w-full rounded-xl border bg-white px-4 pr-12 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100 ${
+                        errorMsg ? "border-red-400" : "border-slate-200"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPasswordVisible((visible) => !visible)}
+                      aria-label={passwordVisible ? "Hide password" : "Show password"}
+                      aria-pressed={passwordVisible}
+                      className="absolute inset-y-0 right-3 inline-flex items-center text-slate-500 hover:text-kez-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kez-blue"
+                    >
+                      {passwordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                    </button>
+                  </span>
                 </label>
                 {errorMsg && (
                   <p className="mt-2 text-xs font-semibold text-red-600">
@@ -939,7 +954,9 @@ function Signup({
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -1185,31 +1202,53 @@ function Signup({
                   </label>
                   <label className="mt-5 block text-sm font-bold text-kez-dark">
                     Create Password
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(e.target.value)
-                        setErrorMsg("")
-                      }}
-                      placeholder="At least 8 characters"
-                      autoComplete="new-password"
-                      className="mt-2 h-13 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100"
-                    />
+                    <span className="relative mt-2 block">
+                      <input
+                        type={passwordVisible ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value)
+                          setErrorMsg("")
+                        }}
+                        placeholder="At least 8 characters"
+                        autoComplete="new-password"
+                        className="h-13 w-full rounded-xl border border-slate-200 px-4 pr-12 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPasswordVisible((visible) => !visible)}
+                        aria-label={passwordVisible ? "Hide password" : "Show password"}
+                        aria-pressed={passwordVisible}
+                        className="absolute inset-y-0 right-3 inline-flex items-center text-slate-500 hover:text-kez-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kez-blue"
+                      >
+                        {passwordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                      </button>
+                    </span>
                   </label>
                   <label className="mt-5 block text-sm font-bold text-kez-dark">
                     Confirm Password
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => {
-                        setConfirmPassword(e.target.value)
-                        setErrorMsg("")
-                      }}
-                      placeholder="Re-enter your password"
-                      autoComplete="new-password"
-                      className="mt-2 h-13 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100"
-                    />
+                    <span className="relative mt-2 block">
+                      <input
+                        type={confirmPasswordVisible ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value)
+                          setErrorMsg("")
+                        }}
+                        placeholder="Re-enter your password"
+                        autoComplete="new-password"
+                        className="h-13 w-full rounded-xl border border-slate-200 px-4 pr-12 text-sm outline-none transition placeholder:text-slate-400 focus:border-kez-blue focus:ring-4 focus:ring-blue-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setConfirmPasswordVisible((visible) => !visible)}
+                        aria-label={confirmPasswordVisible ? "Hide confirmation password" : "Show confirmation password"}
+                        aria-pressed={confirmPasswordVisible}
+                        className="absolute inset-y-0 right-3 inline-flex items-center text-slate-500 hover:text-kez-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kez-blue"
+                      >
+                        {confirmPasswordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                      </button>
+                    </span>
                   </label>
                   {errorMsg && (
                     <p className="mt-2 text-xs font-semibold text-red-600">
@@ -1256,6 +1295,7 @@ const studentNav: NavItem[] = [
   ["feedback", MessageSquare, "Feedback"],
   ["progress", TrendingUp, "My Progress"],
   ["results", BarChart3, "Results"],
+  ["notifications", Bell, "Notifications"],
   ["profile", User, "Profile"],
 ]
 function StudentApp({ onExit }: { onExit: () => void }) {
@@ -1263,6 +1303,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
   const firstName = profile?.full_name?.split(" ")[0] ?? "there"
   const avatarLetter = profile?.full_name?.[0]?.toUpperCase() ?? "?"
   const [page, setPage] = useState("dashboard")
+  const [selectedAnnouncementId, setSelectedAnnouncementId] = useState<string | null>(null)
   const [taskId, setTaskId] = useState<string | null>(null)
   const { submissions, error, reload } = useSubmissionList(profile?.id)
   // Refresh when switching pages so new recordings and feedback show up.
@@ -1272,6 +1313,10 @@ function StudentApp({ onExit }: { onExit: () => void }) {
     setTaskId(id)
     setPage("activity")
   }
+  const navigate = (next: string, relatedId?: string | null) => {
+    setSelectedAnnouncementId(next === "announcements" ? relatedId ?? null : null)
+    setPage(next === "announcements" ? "notifications" : next)
+  }
   const titles: Record<string, string> = {
     dashboard: `${greeting()}, ${firstName}! 👋`,
     assessment: "My Speaking Assessment",
@@ -1280,6 +1325,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
     feedback: "Your Feedback",
     progress: "My Speaking Progress",
     results: "My Results",
+    notifications: "Notifications",
     profile: "Your Profile",
   }
   return (
@@ -1290,11 +1336,13 @@ function StudentApp({ onExit }: { onExit: () => void }) {
       title={titles[page]}
       nav={studentNav}
       isActive={(id) => page === id || (id === "activities" && page === "activity")}
-      onNavigate={setPage}
+      onNavigate={navigate}
       userName={profile?.full_name ?? "Student"}
       userSubtitle="Learner"
       avatarLetter={avatarLetter}
       onSignOut={signOut}
+      notificationUserId={profile?.id ?? ""}
+      notificationRole="student"
     >
       <div className="mx-auto max-w-[1240px] p-4 sm:p-6 lg:p-10">
         {page === "dashboard" && (
@@ -1316,6 +1364,7 @@ function StudentApp({ onExit }: { onExit: () => void }) {
           <AssessmentResults learnerId={profile.id} onRecord={() => startTask(null)} />
         )}
         {page === "profile" && profile && <ProfileCard profile={profile} submissions={submissions} />}
+        {page === "notifications" && profile && <NotificationsPage userId={profile.id} role="student" selectedAnnouncementId={selectedAnnouncementId} />}
       </div>
     </DashboardLayout>
   )
@@ -1326,6 +1375,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
   const firstName = profile?.full_name?.split(" ")[0] ?? "there"
   const avatarLetter = profile?.full_name?.[0]?.toUpperCase() ?? "?"
   const [page, setPage] = useState("dashboard")
+  const [selectedAnnouncementId, setSelectedAnnouncementId] = useState<string | null>(null)
   const [reviewId, setReviewId] = useState<string | null>(null)
   const [learnerId, setLearnerId] = useState<string | null>(null)
   const isSuperAdmin = profile?.role === "super_admin"
@@ -1349,6 +1399,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
     ["feedback", MessageSquare, "Feedback"],
     ["progress", TrendingUp, "Progress"],
     ["reports", BarChart3, "Reports"],
+    ["notifications", Bell, "Notifications"],
     ["profile", User, "Profile"],
   ]
   const titles: Record<string, string> = {
@@ -1363,11 +1414,14 @@ function TutorApp({ onExit }: { onExit: () => void }) {
     feedback: "Feedback",
     progress: "Speaking Progress Comparison",
     reports: "Learner Reports",
+    notifications: "Notifications",
     profile: "Your Profile",
   }
-  const navigate = (next: string) => {
-    if (next !== page) setReviewId(null)
-    setPage(next)
+  const navigate = (next: string, relatedId?: string | null) => {
+    if (relatedId && ["review", "submissions", "feedback"].includes(next)) setReviewId(relatedId)
+    else if (next !== page) setReviewId(null)
+    setSelectedAnnouncementId(next === "announcements" ? relatedId ?? null : null)
+    setPage(next === "announcements" ? "notifications" : next)
   }
   return (
     <DashboardLayout
@@ -1383,6 +1437,8 @@ function TutorApp({ onExit }: { onExit: () => void }) {
       userSubtitle={isSuperAdmin ? "Super Admin" : "Tutor & Assessor"}
       avatarLetter={avatarLetter}
       onSignOut={signOut}
+      notificationUserId={profile?.id ?? ""}
+      notificationRole={(profile?.role ?? "tutor") as NotificationRole}
     >
       <div className="mx-auto max-w-[1280px] p-4 sm:p-6 lg:p-10">
         {page === "dashboard" && (
@@ -1416,6 +1472,9 @@ function TutorApp({ onExit }: { onExit: () => void }) {
           <LearnerProgress submissions={submissions} error={error} learnerId={learnerId} onSelect={setLearnerId} />
         )}
         {page === "profile" && profile && <ProfileCard profile={profile} submissions={submissions} />}
+        {page === "notifications" && profile && (
+          <NotificationsPage userId={profile.id} role={(profile.role ?? "tutor") as NotificationRole} selectedAnnouncementId={selectedAnnouncementId} />
+        )}
       </div>
     </DashboardLayout>
   )

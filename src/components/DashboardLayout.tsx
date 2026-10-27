@@ -1,4 +1,7 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from "react"
+import NotificationBell from "./notifications/NotificationBell"
+import NotificationProvider from "./notifications/NotificationProvider"
+import type { NotificationRole } from "../lib/notifications"
 import ThemeToggle from "./ThemeToggle"
 
 // The icon is an emoji string or an icon component (e.g. from lucide-react).
@@ -12,12 +15,14 @@ type Props = {
   title: string
   nav: NavItem[]
   isActive: (id: string) => boolean
-  onNavigate: (id: string) => void
+  onNavigate: (id: string, relatedId?: string | null) => void
   badges?: Record<string, ReactNode>
   userName: string
   userSubtitle: string
   avatarLetter: string
   onSignOut: () => void
+  notificationUserId: string
+  notificationRole: NotificationRole
   children: ReactNode
 }
 
@@ -26,7 +31,7 @@ type Props = {
  * large screens and a slide-in drawer (opened from the header) below `lg`.
  */
 export default function DashboardLayout(props: Props) {
-  const { brand, workspaceLabel, eyebrow, title, nav, isActive, onNavigate, badges, userName, userSubtitle, avatarLetter, onSignOut, children } = props
+  const { brand, workspaceLabel, eyebrow, title, nav, isActive, onNavigate, badges, userName, userSubtitle, avatarLetter, onSignOut, notificationUserId, notificationRole, children } = props
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -42,8 +47,8 @@ export default function DashboardLayout(props: Props) {
     }
   }, [menuOpen])
 
-  const navigate = (id: string) => {
-    onNavigate(id)
+  const navigate = (id: string, relatedId?: string | null) => {
+    onNavigate(id, relatedId)
     setMenuOpen(false)
     window.scrollTo({ top: 0 })
   }
@@ -93,6 +98,7 @@ export default function DashboardLayout(props: Props) {
   )
 
   return (
+    <NotificationProvider userId={notificationUserId} role={notificationRole} onNavigate={navigate}>
     <div className="flex min-h-dvh bg-[#f8fbff] text-kez-dark">
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col bg-kez-dark px-3 py-5 text-white lg:flex">{sidebar}</aside>
 
@@ -118,12 +124,13 @@ export default function DashboardLayout(props: Props) {
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <ThemeToggle />
-            <span className="hidden size-10 place-items-center rounded-full bg-kez-blue-light sm:grid">🔔</span>
+            <NotificationBell />
             <span className="grid size-9 place-items-center rounded-full bg-kez-yellow font-bold text-kez-dark sm:size-10">{avatarLetter}</span>
           </div>
         </header>
         {children}
       </main>
     </div>
+    </NotificationProvider>
   )
 }
