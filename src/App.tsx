@@ -504,9 +504,11 @@ function Landing({
 function Login({
   onBack,
   onSignup,
+  onForgotPassword,
 }: {
   onBack: () => void
   onSignup: () => void
+  onForgotPassword: () => void
 }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -542,32 +544,6 @@ function Login({
     }
   }
 
-  async function forgotPassword() {
-    const trimmedEmail = email.trim()
-    if (!trimmedEmail || !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
-      setErrorMsg("Enter your email above, then click “Forgot password?” again.")
-      return
-    }
-    setResending(true)
-    setErrorMsg("")
-    setInfoMsg("")
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-        redirectTo: window.location.origin,
-      })
-      if (error && /rate limit/i.test(error.message)) {
-        setErrorMsg("Too many emails were sent recently. Please wait a while and try again.")
-      } else {
-        // Same message either way, so this can't be used to discover accounts.
-        setInfoMsg("If an account exists for that email, a password reset link is on its way.")
-      }
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to send the reset email.")
-    } finally {
-      setResending(false)
-    }
-  }
-
   async function submit(event: FormEvent) {
     event.preventDefault()
     setErrorMsg("")
@@ -590,10 +566,18 @@ function Login({
     const trimmedEmail = email.trim()
     console.log("[KezSpeak] Attempting login for:", trimmedEmail)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: trimmedEmail,
-      password,
-    })
+    let error: { message: string } | null = null
+    try {
+      const result = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      })
+      error = result.error
+    } catch {
+      setLoading(false)
+      setErrorMsg("We couldn't connect to KezSpeak. Please try again.")
+      return
+    }
 
     if (error) {
       console.log("[KezSpeak] Login failed — Supabase error:", error.message)
@@ -686,15 +670,11 @@ function Login({
               </p>
             </div>
 
-            {banner && (
+            {infoMsg && (
               <div
-                className={`mb-6 rounded-2xl p-4 text-xs font-semibold leading-5 ${
-                  banner.type === "error"
-                    ? "border border-amber-200 bg-amber-50 text-amber-900"
-                    : "border border-blue-200 bg-blue-50 text-blue-900"
-                }`}
+                className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-xs font-semibold leading-5 text-blue-900"
               >
-                <p>{banner.message}</p>
+                <p>{infoMsg}</p>
               </div>
             )}
 
@@ -735,6 +715,16 @@ function Login({
                     {errorMsg}
                   </p>
                 )}
+                {showResend && (
+                  <button
+                    type="button"
+                    onClick={() => void resendConfirmation()}
+                    disabled={resending}
+                    className="mt-3 text-sm font-semibold text-kez-blue disabled:opacity-60"
+                  >
+                    {resending ? "Sending confirmation..." : "Resend confirmation email"}
+                  </button>
+                )}
                 <div className="mt-5 flex items-center justify-between">
                   <label className="flex items-center gap-2 text-sm text-slate-600">
                     <input
@@ -745,6 +735,7 @@ function Login({
                   </label>
                   <button
                     type="button"
+                    onClick={onForgotPassword}
                     className="text-sm font-bold text-kez-blue"
                   >
                     Forgot password?
@@ -818,7 +809,11 @@ function PasswordRecovery({
           redirectTo: `${window.location.origin}/reset-password`,
         })
         if (requestError) {
-          setError("We couldn't process your request right now. Please check your connection and try again.")
+          if (/rate limit|too many/i.test(requestError.message)) {
+            setError("Too many emails were sent recently. Please wait a while and try again.")
+          } else {
+            setError("We couldn't process your request right now. Please check your connection and try again.")
+          }
           return
         }
         setSent(true)
@@ -1451,10 +1446,17 @@ export default function App() {
     () => window.location.pathname === "/reset-password" ? "checking" : "invalid",
   )
   const recoveryEventSeen = useRef(false)
+  const authEventSequence = useRef(0)
 
   const navigate = (nextPath: string, replace = false) => {
     if (window.location.pathname !== nextPath) window.history[replace ? "replaceState" : "pushState"]({}, "", nextPath)
     setPath(nextPath)
+  }
+
+  const showNoProfile = () => {
+    setProfile(null)
+    setAuthState("unauthenticated")
+    setNoProfile(true)
   }
 
   const signOut = async () => {
@@ -1473,11 +1475,25 @@ export default function App() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        const eventSequence = ++authEventSequence.current
         console.log("[KezSpeak] Auth event:", event, "user:", session?.user?.id ?? null)
+        if (event === "PASSWORD_RECOVERY") {
+          recoveryEventSeen.current = true
+          setRecoveryStatus(session?.access_token && session.user ? "ready" : "invalid")
+          navigate("/reset-password", true)
+        } else if (
+          event === "INITIAL_SESSION" &&
+          window.location.pathname === "/reset-password" &&
+          !recoveryEventSeen.current
+        ) {
+          setRecoveryStatus("invalid")
+        }
         window.setTimeout(() => {
           void (async () => {
-        const { data: { user: authenticatedUser } } = await supabase.auth.getUser()
+        try {
+        const authenticatedUser = session?.user ?? null
         if (!authenticatedUser) {
+          if (eventSequence !== authEventSequence.current) return
           setUser(null)
           setProfile(null)
           setAuthState("unauthenticated")
@@ -1485,12 +1501,14 @@ export default function App() {
           return
         }
         if (authenticatedUser) {
-          setUser(authenticatedUser)
           const { data, error } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", authenticatedUser.id)
             .single()
+
+          if (eventSequence !== authEventSequence.current) return
+          setUser(authenticatedUser)
 
           console.log("[KezSpeak] Profile lookup — data:", data, "error:", error?.message ?? null)
 
@@ -1531,7 +1549,9 @@ export default function App() {
             setAuthState("authenticated")
             setNoProfile(false)
             setView(viewFor(role))
+          }
           } catch (err) {
+            if (eventSequence !== authEventSequence.current) return
             console.error("[KezSpeak] Error during profile lookup:", err)
             showNoProfile()
           }
@@ -1539,7 +1559,10 @@ export default function App() {
       }, 0)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      authEventSequence.current += 1
+      subscription.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
@@ -1608,6 +1631,7 @@ export default function App() {
       <Login
         onBack={() => navigate("/")}
         onSignup={() => navigate("/signup")}
+        onForgotPassword={() => navigate("/forgot-password")}
       />
     )
   }

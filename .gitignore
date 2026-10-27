@@ -34,3 +34,8 @@ __pycache__/
 ml-service/model/desktop.ini
 # Database migrations are shared privately within the team, not on GitHub.
 supabase/migrations/
+
+# Python virtual environments
+.venv/
+venv/
+ml-service/.venv/
