@@ -6,6 +6,9 @@ build/
 .env.local
 .env.*.local
 server/.env
+# Catch-all: no env file except .env.example (re-included below) is ever committed.
+.env*
+**/.env*
 .vite/
 vite.config.*.timestamp-*
 *.tsbuildinfo
@@ -16,9 +19,18 @@ logs/
 .tmp-*
 /.figma/design-context/
 
+# ML service
+ml-service/.venv/
+__pycache__/
+.pytest_cache/
+!.env.example
+
 # Platform-managed agentplat state, not project source. In the
 # client-initiated single-repo workspace layout (make's `Path: "."` spec) the
 # repo root IS the workspace root, so these land inside this repo rather than
 # beside it.
 /.plugins/
 /.opencode-skills/
+ml-service/model/desktop.ini
+# Database migrations are shared privately within the team, not on GitHub.
+supabase/migrations/
