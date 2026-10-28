@@ -122,23 +122,33 @@ export default function RecordActivity({
   learnerId,
   onViewResults,
   initialTaskId = null,
+  openTaskIds,
 }: {
   learnerId: string
   onViewResults: () => void
   initialTaskId?: string | null
+  /** Pre/post tasks the learner has an open assignment for; others are hidden (the DB refuses them too). */
+  openTaskIds?: Set<string>
 }) {
   const [tasks, setTasks] = useState<AssessmentTask[]>([])
   const [taskId, setTaskId] = useState<string | null>(initialTaskId)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [submissionId, setSubmissionId] = useState<string | null>(null)
   const [startError, setStartError] = useState<string | null>(null)
   const { submission, error: pollError, refresh } = useSubmission(submissionId)
 
   useEffect(() => {
     listTasks()
-      .then((list) => {
+      .then((all) => {
+        const list = all.filter((t) => !openTaskIds || t.kind === "practice" || openTaskIds.has(t.id))
         setTasks(list)
-        setTaskId((current) => current ?? list.find((t) => t.kind === "practice")?.id ?? list[0]?.id ?? null)
+        if (initialTaskId && !list.some((t) => t.id === initialTaskId) && all.some((t) => t.id === initialTaskId)) {
+          setNotice("That assessment hasn't been assigned to you yet. Your tutor will assign it when it's time. You can practice in the meantime.")
+        }
+        setTaskId((current) =>
+          current && list.some((t) => t.id === current) ? current : (list.find((t) => t.kind === "practice")?.id ?? list[0]?.id ?? null),
+        )
       })
       .catch((err: Error) => setLoadError(err.message))
   }, [])
@@ -150,6 +160,7 @@ export default function RecordActivity({
 
   return (
     <section className="mx-auto max-w-3xl text-center">
+      {notice && !submissionId && <p className="mb-6 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">{notice}</p>}
       {!submissionId && (
         <div className="mb-6 flex flex-wrap justify-center gap-2">
           {tasks.map((t) => (

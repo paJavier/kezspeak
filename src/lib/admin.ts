@@ -1,13 +1,14 @@
-import { callMlService, type AssessmentTask, type TaskKind } from "./assessments"
+import { callMlService, type AssessmentTask } from "./assessments"
 import { supabase } from "./supabase"
 
 export type Role = "student" | "tutor" | "admin" | "super_admin"
 
+// Display names only. The database keeps the role values (admin, super_admin).
 export const roleLabels: Record<Role, string> = {
   student: "Student",
   tutor: "Tutor / Teacher",
-  admin: "Admin",
-  super_admin: "Super Admin",
+  admin: "Staff",
+  super_admin: "Administrator",
 }
 
 export type ManagedUser = {
@@ -53,11 +54,17 @@ export const deleteUser = (id: string) =>
 
 export type TaskInput = Omit<AssessmentTask, "id">
 
-export async function saveTask(task: TaskInput, id?: string): Promise<void> {
+/** New tasks record their creator; tutors may only change their own practice tasks (RLS). */
+export async function saveTask(task: TaskInput, id?: string, createdBy?: string): Promise<void> {
+  // Never rewrite created_by on update.
+  const { created_by: _ignored, ...fields } = task
   const { error } = id
-    ? await supabase.from("assessment_tasks").update(task).eq("id", id)
-    : await supabase.from("assessment_tasks").insert(task)
-  if (error) throw new Error(`Could not save the task: ${error.message}`)
+    ? await supabase.from("assessment_tasks").update(fields).eq("id", id)
+    : await supabase.from("assessment_tasks").insert({ ...fields, created_by: createdBy ?? null })
+  if (error) {
+    if (error.code === "42501") throw new Error("You can only change practice tasks you created.")
+    throw new Error(`Could not save the task: ${error.message}`)
+  }
 }
 
 export async function deleteTask(id: string): Promise<void> {
@@ -69,45 +76,4 @@ export async function deleteTask(id: string): Promise<void> {
   }
 }
 
-export type Assignment = {
-  id: string
-  task_id: string
-  learner_id: string
-  tutor_id: string
-  due_at: string | null
-  status: "assigned" | "submitted" | "reviewed"
-  created_at: string
-  task: { title: string; kind: TaskKind } | null
-}
-
-export async function listAssignments(): Promise<Assignment[]> {
-  const { data, error } = await supabase
-    .from("assignments")
-    .select("*, task:assessment_tasks(title, kind)")
-    .order("created_at", { ascending: false })
-  if (error) throw new Error(`Could not load assignments: ${error.message}`)
-  return (data ?? []).map((row) => ({ ...row, task: Array.isArray(row.task) ? (row.task[0] ?? null) : row.task }))
-}
-
-export async function createAssignment(input: {
-  task_id: string
-  learner_id: string
-  tutor_id: string
-  due_at: string | null
-}): Promise<void> {
-  const { error } = await supabase.from("assignments").insert(input)
-  if (error) {
-    if (error.code === "23505") throw new Error("This learner already has this task assigned.")
-    throw new Error(`Could not create the assignment: ${error.message}`)
-  }
-}
-
-export async function updateAssignment(id: string, changes: { tutor_id?: string; due_at?: string | null }): Promise<void> {
-  const { error } = await supabase.from("assignments").update(changes).eq("id", id)
-  if (error) throw new Error(`Could not update the assignment: ${error.message}`)
-}
-
-export async function deleteAssignment(id: string): Promise<void> {
-  const { error } = await supabase.from("assignments").delete().eq("id", id)
-  if (error) throw new Error(`Could not delete the assignment: ${error.message}`)
-}
+// Assignments and rosters live in lib/classroom.ts.

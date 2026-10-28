@@ -51,10 +51,18 @@ export type LearnerSummary = {
   status: LearnerStatus
 }
 
-/** One row per learner from the submissions the current tutor/admin can see. */
-export function summarizeLearners(submissions: Submission[]): LearnerSummary[] {
+type PersonLike = { id: string; full_name: string; role: string }
+
+/**
+ * One row per learner the current tutor/admin can see. Pass `people`
+ * (kez_list_people: a tutor's students, or every student for admins) so
+ * learners who haven't recorded anything yet still get a row.
+ */
+export function summarizeLearners(submissions: Submission[], people?: PersonLike[] | null): LearnerSummary[] {
   const byLearner = new Map<string, Submission[]>()
   for (const s of submissions) byLearner.set(s.learner_id, [...(byLearner.get(s.learner_id) ?? []), s])
+  for (const p of people ?? []) if (p.role === "student" && !byLearner.has(p.id)) byLearner.set(p.id, [])
+  const nameOf = (id: string) => people?.find((p) => p.id === id)?.full_name
 
   return [...byLearner.entries()]
     .map(([learnerId, list]) => {
@@ -75,14 +83,15 @@ export function summarizeLearners(submissions: Submission[]): LearnerSummary[] {
               : "Not assessed yet"
       return {
         learnerId,
-        name: list[0].learner_name ?? "Learner",
+        name: nameOf(learnerId) ?? list[0]?.learner_name ?? "Learner",
         journey,
         submissions: list,
         lastActivity: list[0]?.submitted_at ?? null,
         status,
       }
     })
-    .sort((a, b) => (b.lastActivity ?? "").localeCompare(a.lastActivity ?? ""))
+    // Most recent activity first; learners with none go last, by name.
+    .sort((a, b) => (b.lastActivity ?? "").localeCompare(a.lastActivity ?? "") || a.name.localeCompare(b.name))
 }
 
 export const statusStyles: Record<LearnerStatus, string> = {

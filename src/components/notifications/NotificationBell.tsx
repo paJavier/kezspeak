@@ -25,6 +25,8 @@ export default function NotificationBell() {
   }, [open])
 
   const badge = unreadCount !== null && unreadCount > 99 ? "99+" : unreadCount
+  // The popover is an inbox: only unread items. Read ones stay on the Notifications page.
+  const unread = notifications.filter((n) => !n.read_at)
 
   return (
     <div className="relative" ref={root}>
@@ -63,9 +65,13 @@ export default function NotificationBell() {
                 <button type="button" onClick={() => void refresh(false)} className="mt-2 font-bold text-kez-blue">Try again</button>
               </div>
             )}
-            {!loading && !error && notifications.length === 0 && <p className="p-5 text-sm text-slate-500">You’re all caught up.</p>}
-            {!loading && !error && notifications.slice(0, 8).map((notification) => (
-              <article key={notification.id} className={`flex gap-2 border-b border-slate-100 p-3 last:border-0 ${notification.read_at ? "bg-white" : "bg-blue-50/70"}`}>
+            {!loading && !error && unread.length === 0 && (
+              <p className="p-5 text-sm text-slate-500">
+                You’re all caught up.{notifications.length > 0 && " Earlier notifications are under View all."}
+              </p>
+            )}
+            {!loading && !error && unread.slice(0, 8).map((notification) => (
+              <article key={notification.id} className="flex gap-2 border-b border-slate-100 bg-blue-50/70 p-3 last:border-0">
                 <button type="button" onClick={() => { openNotification(notification); setOpen(false) }} className="min-w-0 flex-1 text-left">
                   <span className="flex items-start gap-2">
                     {!notification.read_at && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-kez-blue" aria-label="Unread" />}

@@ -34,9 +34,9 @@ The core loop is: **Assess → Practice → Improve → Reassess → Measure**.
 | Role | What they can do |
 |---|---|
 | **Student** | Record and submit speaking tasks, follow processing status, view results and tutor feedback, compare pre and post results |
-| **Tutor / Teacher** | Review assigned learners' recordings (audio, transcript, features, machine estimate), give feedback, adjust scores, run the research-only Gemini comparison |
-| **Admin** | Same view as a tutor, across all learners |
-| **Super Admin** | Everything above, plus account management (invite, edit, delete), assignments and tasks |
+| **Tutor / Teacher** | Assign classwork with due dates and grade it, review their students' recordings (audio, transcript, features, machine estimate), give feedback, adjust scores, run the research-only Gemini comparison |
+| **Staff** (`admin` in the database) | Same view as a tutor, across all learners |
+| **Administrator** (`super_admin` in the database) | Everything above, plus account management (invite, edit, delete) and setting each student's tutor |
 
 Also included: invite and password-reset emails, "Forgot password?", password change under Profile, dark mode and a responsive layout.
 
@@ -164,16 +164,22 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 > **Rule:** anything starting with `VITE_` is shipped to every visitor's browser. A secret must **never** get a `VITE_` prefix.
 
+> **You need two terminals, both open at the same time.** The web app and the ML service each keep their terminal busy while they run, so there is no prompt left to type the next command. Don't press Ctrl+C in one to free it up, because that stops the server. Open a second terminal instead: in VS Code, click **+** in the terminal panel, or use **Split Terminal**.
+
 ## 4. Run the web app (terminal 1)
+
+From the project root (the `kezspeak` folder, not `ml-service`):
 
 ```powershell
 npm install
 npm run dev
 ```
 
-Open **http://localhost:8443**. The page reloads automatically when you save a file.
+Open **http://localhost:8443**. The page reloads automatically when you save a file. Leave this terminal running.
 
 ## 5. Run the ML service (terminal 2)
+
+Open a **new** terminal for this step and keep terminal 1 running.
 
 **First time only:**
 
@@ -191,25 +197,31 @@ cd ml-service
 $env:ENABLE_GRAMMAR="false"; .venv\Scripts\uvicorn app.main:app --port 8000
 ```
 
-- Wait for `Application startup complete.` The first start downloads Whisper, which takes a minute or two.
-- Check http://localhost:8000/health. It should show `"loaded": true`.
+- Wait for `Uvicorn running on http://127.0.0.1:8000`. The first start downloads Whisper, which takes a minute or two.
+- **Leave this terminal alone while you use the app.** The service runs only as long as this terminal stays open and you don't press Ctrl+C.
+- Check http://localhost:8000/health. It should show `"loaded": true`. If the page doesn't load, the service isn't running.
+- The XGBoost warning about "loading a serialized model" is expected and harmless. `Scoring model loaded` on the next line means the model loaded fine.
+- When you press Ctrl+C, uvicorn prints a `KeyboardInterrupt` / `CancelledError` traceback. That's a normal shutdown, not a crash.
 - If you installed Java and have RAM to spare, leave out `$env:ENABLE_GRAMMAR="false";` to get grammar counts.
 - Add `--reload` to restart the service automatically when you edit Python files.
 
 > **macOS/Linux:** use `python3`, and `.venv/bin/` instead of `.venv\Scripts\`. Start the service with `ENABLE_GRAMMAR=false .venv/bin/uvicorn app.main:app --port 8000`.
 
-Keep **both terminals open** while you use the app.
+Keep **both terminals open** while you use the app. To stop everything, press Ctrl+C in each terminal.
 
 ## 6. Log in and try it
 
-1. **Become a super admin** (once). After signing up, ask someone with Supabase access to run this in the SQL editor:
+1. **Become an Administrator** (once; the database role is `super_admin`). After signing up, ask someone with Supabase access to run this in the SQL editor:
    ```sql
    update public.profiles set role = 'super_admin' where email = 'your@email.com';
    ```
 2. **Users → Create an account:** make one **Tutor / Teacher** and one **Student**. Untick "Send an invite email" and set a temporary password if email isn't set up yet.
-3. **Assignments:** link the student to the tutor through a task. Tutors only see learners assigned to them.
-4. Log in as the **student** → Speaking Activities → Start → record 30–60 seconds → Submit. Processing takes about 20–30 seconds.
-5. Log in as the **tutor** → Submissions → open the recording to see the transcript, metrics, machine estimate and AI comparison. You can add feedback there.
+3. **Users → set the student's tutor** (the "Tutor" dropdown on the student's row). Tutors only see their own students.
+4. Log in as the **tutor** → **Classwork** → **+ Create assignment**: pick a task, tick the student and set a due date. The student gets a notification.
+5. Log in as the **student** → Speaking Activities → the task is under **Assigned to you** → Start → record 30–60 seconds → Submit. Processing takes about 20–30 seconds.
+6. Log in as the **tutor** → Submissions (or Classwork → Open recording) to see the transcript, metrics, machine estimate and AI comparison. Add feedback there, then enter a grade in Classwork. Work not turned in by the due date is marked Missing (0).
+
+The shared Supabase project already has every migration applied. For a new project, see the migration list in [SETUP.md §7](SETUP.md#7-database-supabase); the files are shared privately, not on GitHub.
 
 ---
 
@@ -226,7 +238,7 @@ kezspeak/
 │   ├── components/
 │   │   ├── student/              Student pages: dashboard, record, results, assessment path
 │   │   ├── tutor/                Tutor pages: dashboard, learners, review, AI comparison
-│   │   ├── admin/                Super admin pages: users, assignments, tasks
+│   │   ├── admin/                Administrator pages: users, tasks
 │   │   ├── DashboardLayout.tsx   Shared sidebar and mobile menu
 │   │   └── …                     Shared pieces (ProfileCard, ThemeToggle, TaskCatalog, …)
 │   ├── hooks/                    useRecorder (microphone), useSubmission (status polling), …
@@ -239,7 +251,7 @@ kezspeak/
 ├── ml-service/                   Python FastAPI service
 │   ├── app/
 │   │   ├── main.py               API routes (process, retry, evaluate, AI comparison)
-│   │   ├── admin.py              /admin/users routes (super admin only)
+│   │   ├── admin.py              /admin/users routes (Administrator only)
 │   │   ├── auth.py               Checks the user's Supabase login
 │   │   ├── db.py                 Database reads and writes
 │   │   ├── gemini.py             Gemini comparison
@@ -322,7 +334,7 @@ $env:ENABLE_GRAMMAR="false"; .venv\Scripts\python -m pytest
 
 | Problem | Fix |
 |---|---|
-| "The assessment service is not reachable" / Users page won't load | The ML service isn't running. Start it (step 5) |
+| "The KezSpeak server (ml-service) is not reachable" / "The assessment service is not reachable" / Users page won't load | The ML service isn't running. Usually it was stopped with Ctrl+C or its terminal was closed, often to run `npm run dev` in the same terminal. Start it again in its own terminal (step 5) and check http://localhost:8000/health |
 | ML service: model can't be loaded / unpickling error | Git LFS wasn't on when you cloned. Run `git lfs install` then `git lfs pull` |
 | `mkl_malloc: failed to allocate memory` / `MemoryError` | Out of RAM. Close other apps and use `ENABLE_GRAMMAR=false` |
 | `npm run dev` or the build crashes with exit code 134 | Out of memory. Close apps or stop the ML service briefly |
@@ -332,7 +344,8 @@ $env:ENABLE_GRAMMAR="false"; .venv\Scripts\python -m pytest
 | AI comparison: "Gemini is unavailable" | Google is busy or the key is missing. Wait and retry, and check `GEMINI_API_KEY` |
 | CORS error calling `localhost:8000` | Your web app runs on a port not listed in `ALLOWED_ORIGINS`. Add it to `.env.local` |
 | `Port 8443 is already in use` | Another dev server is running. Close it |
-| `python` not found / opens the Microsoft Store | Reinstall Python 3.11 from python.org with "Add to PATH" ticked |
+| `python` not found / opens the Microsoft Store / "The file cannot be accessed by the system" | That's the Windows Store placeholder. Reinstall Python 3.11 from python.org with "Add to PATH" ticked, or turn off the `python.exe` entries under Settings → Apps → Advanced app settings → App execution aliases. Once `.venv` exists, the ML service doesn't need plain `python` |
+| `cd ml-service` says the path doesn't exist | You're already inside `ml-service`. Check the path shown in the prompt |
 
 More fixes are in [SETUP.md §10](SETUP.md#10-troubleshooting).
 

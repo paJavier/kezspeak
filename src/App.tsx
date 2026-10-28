@@ -8,7 +8,7 @@ import {
   Eye,
   EyeOff,
   Headphones,
-  Link2,
+  ClipboardList,
   ListChecks,
   LayoutDashboard,
   MessageCircle,
@@ -29,7 +29,6 @@ import SubmissionReview from "./components/tutor/SubmissionReview"
 import DashboardLayout, { type NavItem } from "./components/DashboardLayout"
 import NotificationsPage from "./components/notifications/NotificationsPage"
 import type { NotificationRole } from "./lib/notifications"
-import AssignmentManagement from "./components/admin/AssignmentManagement"
 import TaskManagement from "./components/admin/TaskManagement"
 import UserManagement from "./components/admin/UserManagement"
 import ProfileCard from "./components/ProfileCard"
@@ -39,7 +38,12 @@ import StudentDashboard from "./components/student/StudentDashboard"
 import LearnerOverview from "./components/tutor/LearnerOverview"
 import LearnerProgress from "./components/tutor/LearnerProgress"
 import TutorDashboard from "./components/tutor/TutorDashboard"
+import Classwork from "./components/tutor/Classwork"
+import Statistics from "./components/tutor/Statistics"
+import MyAssignments from "./components/student/MyAssignments"
 import useSubmissionList from "./hooks/useSubmissionList"
+import usePeople from "./hooks/usePeople"
+import useMyAssignments from "./hooks/useMyAssignments"
 import { greeting, needsReview } from "./lib/progress"
 
 type View = "landing" | "login" | "signup" | "student" | "tutor" | "admin"
@@ -1292,12 +1296,12 @@ const studentNav: NavItem[] = [
   ["dashboard", LayoutDashboard, "Dashboard"],
   ["assessment", ClipboardCheck, "My Assessment"],
   ["activities", MessageCircle, "Speaking Activities"],
-  ["feedback", MessageSquare, "Feedback"],
-  ["progress", TrendingUp, "My Progress"],
   ["results", BarChart3, "Results"],
   ["notifications", Bell, "Notifications"],
   ["profile", User, "Profile"],
 ]
+// Old page ids that notifications and buttons may still use.
+const studentAliases: Record<string, string> = { feedback: "results", progress: "results", announcements: "notifications" }
 function StudentApp({ onExit }: { onExit: () => void }) {
   const { profile, signOut } = useAuth()
   const firstName = profile?.full_name?.split(" ")[0] ?? "there"
@@ -1306,8 +1310,12 @@ function StudentApp({ onExit }: { onExit: () => void }) {
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState<string | null>(null)
   const [taskId, setTaskId] = useState<string | null>(null)
   const { submissions, error, reload } = useSubmissionList(profile?.id)
+  // Assigned work; pre/post tasks are only offered while an assignment is open.
+  const myAssignments = useMyAssignments()
+  const reloadAssignments = myAssignments.reload
   // Refresh when switching pages so new recordings and feedback show up.
   useEffect(reload, [page, reload])
+  useEffect(reloadAssignments, [page, reloadAssignments])
 
   const startTask = (id: string | null) => {
     setTaskId(id)
@@ -1315,16 +1323,14 @@ function StudentApp({ onExit }: { onExit: () => void }) {
   }
   const navigate = (next: string, relatedId?: string | null) => {
     setSelectedAnnouncementId(next === "announcements" ? relatedId ?? null : null)
-    setPage(next === "announcements" ? "notifications" : next)
+    setPage(studentAliases[next] ?? next)
   }
   const titles: Record<string, string> = {
     dashboard: `${greeting()}, ${firstName}! 👋`,
     assessment: "My Speaking Assessment",
     activities: "Speaking Activities",
     activity: "Speaking Task",
-    feedback: "Your Feedback",
-    progress: "My Speaking Progress",
-    results: "My Results",
+    results: "My Results & Feedback",
     notifications: "Notifications",
     profile: "Your Profile",
   }
@@ -1346,21 +1352,36 @@ function StudentApp({ onExit }: { onExit: () => void }) {
     >
       <div className="mx-auto max-w-[1240px] p-4 sm:p-6 lg:p-10">
         {page === "dashboard" && (
-          <StudentDashboard submissions={submissions} error={error} onNavigate={setPage} onStartTask={startTask} />
+          <StudentDashboard submissions={submissions} error={error} onNavigate={navigate} onStartTask={startTask} />
         )}
         {page === "assessment" && (
-          <AssessmentPath submissions={submissions} error={error} onNavigate={setPage} onStartTask={startTask} />
+          <AssessmentPath submissions={submissions} error={error} onNavigate={navigate} onStartTask={startTask} />
         )}
-        {page === "activities" && <TaskCatalog onStart={startTask} />}
-        {page === "activity" && profile && (
+        {page === "activities" && (
+          <>
+            <MyAssignments
+              assignments={myAssignments.assignments}
+              error={myAssignments.error}
+              submissions={submissions}
+              onStart={startTask}
+            />
+            <TaskCatalog onStart={startTask} openTaskIds={myAssignments.openTaskIds} />
+          </>
+        )}
+        {page === "activity" && profile && !myAssignments.assignments && !myAssignments.error && (
+          <p className="text-center text-slate-500">Loading speaking tasks…</p>
+        )}
+        {page === "activity" && profile && (myAssignments.assignments || myAssignments.error) && (
           <RecordActivity
             key={taskId ?? "default"}
             learnerId={profile.id}
             initialTaskId={taskId}
+            // If assignments failed to load, show every task; the database still refuses unassigned pre/post.
+            openTaskIds={myAssignments.assignments ? myAssignments.openTaskIds : undefined}
             onViewResults={() => setPage("results")}
           />
         )}
-        {(page === "feedback" || page === "progress" || page === "results") && profile && (
+        {page === "results" && profile && (
           <AssessmentResults learnerId={profile.id} onRecord={() => startTask(null)} />
         )}
         {page === "profile" && profile && <ProfileCard profile={profile} submissions={submissions} />}
@@ -1368,6 +1389,15 @@ function StudentApp({ onExit }: { onExit: () => void }) {
       </div>
     </DashboardLayout>
   )
+}
+
+// Old page ids that notifications may still use.
+const tutorAliases: Record<string, string> = {
+  submissions: "review",
+  feedback: "review",
+  activities: "tasks",
+  assignments: "users",
+  announcements: "notifications",
 }
 
 function TutorApp({ onExit }: { onExit: () => void }) {
@@ -1379,62 +1409,56 @@ function TutorApp({ onExit }: { onExit: () => void }) {
   const [reviewId, setReviewId] = useState<string | null>(null)
   const [learnerId, setLearnerId] = useState<string | null>(null)
   const isSuperAdmin = profile?.role === "super_admin"
+  const isAdmin = isSuperAdmin || profile?.role === "admin"
   const { submissions, error, reload } = useSubmissionList()
+  // Learners set to this tutor (all students for admins), so they show before their first recording.
+  const { people, error: peopleError, reload: reloadPeople } = usePeople()
   useEffect(reload, [page, reload])
+  useEffect(reloadPeople, [page, reloadPeople])
   const pendingCount = submissions?.filter(needsReview).length ?? 0
 
   const nav: NavItem[] = [
     ["dashboard", LayoutDashboard, "Dashboard"],
-    ...(isSuperAdmin
-      ? ([
-          ["users", ShieldCheck, "Users"],
-          ["assignments", Link2, "Assignments"],
-          ["tasks", ListChecks, "Tasks"],
-        ] as NavItem[])
-      : []),
-    ["learners", Users, "Learners"],
-    ["submissions", ClipboardCheck, "Assessments"],
-    ["activities", MessageCircle, "Speaking Activities"],
+    ["classwork", ClipboardList, "Classwork"],
     ["review", Headphones, "Submissions"],
-    ["feedback", MessageSquare, "Feedback"],
-    ["progress", TrendingUp, "Progress"],
-    ["reports", BarChart3, "Reports"],
+    ["learners", Users, "Learners"],
+    ["tasks", ListChecks, "Tasks"],
+    ["reports", BarChart3, "Statistics"],
+    ...(isSuperAdmin ? ([["users", ShieldCheck, "Users"]] as NavItem[]) : []),
     ["notifications", Bell, "Notifications"],
     ["profile", User, "Profile"],
   ]
   const titles: Record<string, string> = {
     dashboard: `${greeting()}, ${firstName}! 👋`,
     users: "User Accounts",
-    assignments: "Tutor Assignments",
+    classwork: "Classwork",
     tasks: "Speaking Tasks",
     learners: "My Learners",
-    submissions: "Assessment Submissions",
-    activities: "Speaking Activities",
-    review: "Speaking Assessment Review",
-    feedback: "Feedback",
+    review: "Submissions",
     progress: "Speaking Progress Comparison",
-    reports: "Learner Reports",
+    reports: "App Statistics",
     notifications: "Notifications",
     profile: "Your Profile",
   }
   const navigate = (next: string, relatedId?: string | null) => {
-    if (relatedId && ["review", "submissions", "feedback"].includes(next)) setReviewId(relatedId)
-    else if (next !== page) setReviewId(null)
+    const target = tutorAliases[next] ?? next
+    if (relatedId && target === "review") setReviewId(relatedId)
+    else if (target !== page) setReviewId(null)
     setSelectedAnnouncementId(next === "announcements" ? relatedId ?? null : null)
-    setPage(next === "announcements" ? "notifications" : next)
+    setPage(target)
   }
   return (
     <DashboardLayout
       brand={<Brand dark />}
-      workspaceLabel={isSuperAdmin ? "Super admin workspace" : "Tutor workspace"}
+      workspaceLabel={isSuperAdmin ? "Administrator workspace" : isAdmin ? "Staff workspace" : "Tutor workspace"}
       eyebrow="KezSpeak Tutor"
       title={titles[page]}
       nav={nav}
-      isActive={(id) => page === id}
+      isActive={(id) => page === id || (id === "learners" && page === "progress")}
       onNavigate={navigate}
       badges={pendingCount ? { review: String(pendingCount) } : undefined}
       userName={profile?.full_name ?? "Tutor"}
-      userSubtitle={isSuperAdmin ? "Super Admin" : "Tutor & Assessor"}
+      userSubtitle={isSuperAdmin ? "Administrator" : isAdmin ? "Staff" : "Tutor & Assessor"}
       avatarLetter={avatarLetter}
       onSignOut={signOut}
       notificationUserId={profile?.id ?? ""}
@@ -1444,6 +1468,7 @@ function TutorApp({ onExit }: { onExit: () => void }) {
         {page === "dashboard" && (
           <TutorDashboard
             submissions={submissions}
+            people={people}
             error={error}
             onReview={(id) => {
               setReviewId(id)
@@ -1454,6 +1479,8 @@ function TutorApp({ onExit }: { onExit: () => void }) {
         {page === "learners" && (
           <LearnerOverview
             submissions={submissions}
+            people={people}
+            peopleError={peopleError}
             error={error}
             onOpen={(id) => {
               setLearnerId(id)
@@ -1461,16 +1488,35 @@ function TutorApp({ onExit }: { onExit: () => void }) {
             }}
           />
         )}
-        {(page === "submissions" || page === "review" || page === "feedback") && profile && (
+        {page === "review" && profile && (
           <SubmissionReview key={`${page}-${reviewId}`} tutorId={profile.id} initialSelectedId={reviewId} onChanged={reload} />
         )}
-        {page === "activities" && <TaskCatalog />}
         {isSuperAdmin && page === "users" && profile && <UserManagement currentUserId={profile.id} />}
-        {isSuperAdmin && page === "assignments" && <AssignmentManagement />}
-        {isSuperAdmin && page === "tasks" && <TaskManagement />}
-        {(page === "progress" || page === "reports") && (
-          <LearnerProgress submissions={submissions} error={error} learnerId={learnerId} onSelect={setLearnerId} />
+        {page === "tasks" && profile && <TaskManagement currentUserId={profile.id} isAdmin={isAdmin} />}
+        {page === "classwork" && profile && (
+          <Classwork
+            currentUserId={profile.id}
+            isAdmin={isAdmin}
+            isSuperAdmin={isSuperAdmin}
+            submissions={submissions}
+            onOpenSubmission={(id) => {
+              setReviewId(id)
+              setPage("review")
+            }}
+            onNavigate={navigate}
+          />
         )}
+        {page === "progress" && (
+          <LearnerProgress
+            submissions={submissions}
+            people={people}
+            error={error}
+            learnerId={learnerId}
+            onSelect={setLearnerId}
+            onBack={() => setPage("learners")}
+          />
+        )}
+        {page === "reports" && <Statistics submissions={submissions} error={error} isAdmin={isAdmin} />}
         {page === "profile" && profile && <ProfileCard profile={profile} submissions={submissions} />}
         {page === "notifications" && profile && (
           <NotificationsPage userId={profile.id} role={(profile.role ?? "tutor") as NotificationRole} selectedAnnouncementId={selectedAnnouncementId} />

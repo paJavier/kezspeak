@@ -21,6 +21,8 @@ export type AssessmentTask = {
   skill_focus: string | null
   kind: TaskKind
   duration_seconds: number
+  /** Who created it; tutors may only change their own practice tasks (RLS). */
+  created_by?: string | null
 }
 
 export type AcousticFeatures = Record<string, number> & {
@@ -81,6 +83,7 @@ export type Submission = {
   id: string
   learner_id: string
   task_id: string
+  assignment_id: string | null
   audio_path: string
   mime_type: string
   duration_seconds: number | null
@@ -159,7 +162,7 @@ async function selectSubmissions<T>(
 export async function listTasks(): Promise<AssessmentTask[]> {
   const { data, error } = await supabase
     .from("assessment_tasks")
-    .select("id, title, prompt, skill_focus, kind, duration_seconds")
+    .select("id, title, prompt, skill_focus, kind, duration_seconds, created_by")
     .order("created_at")
   if (error) throw new Error(`Could not load speaking tasks: ${error.message}`)
   return data ?? []
@@ -368,15 +371,20 @@ export type PrePostComparison = {
   metrics: { label: string; pre: number | null; post: number | null; unit: string }[]
 }
 
-const latestCompleted = (submissions: Submission[], kind: TaskKind) =>
+const completedOfKind = (submissions: Submission[], kind: TaskKind) =>
   submissions
     .filter((s) => s.task?.kind === kind && s.status === "completed" && s.evaluation)
-    .sort((a, b) => b.submitted_at.localeCompare(a.submitted_at))[0] ?? null
+    .sort((a, b) => a.submitted_at.localeCompare(b.submitted_at))
 
 // Score Change = Post - Pre; Improvement (%) = (Post - Pre) / Pre x 100 (paper, Sec. III.J).
+// The baseline is the FIRST completed pre-assessment, so a later re-take can't
+// move it; the post is the latest completed post-assessment after that baseline.
 export function comparePrePost(submissions: Submission[]): PrePostComparison {
-  const pre = latestCompleted(submissions, "pre")
-  const post = latestCompleted(submissions, "post")
+  const pre = completedOfKind(submissions, "pre")[0] ?? null
+  const post =
+    completedOfKind(submissions, "post")
+      .filter((s) => !pre || s.submitted_at > pre.submitted_at)
+      .at(-1) ?? null
   const preScore = pre ? finalScore(pre) : null
   const postScore = post ? finalScore(post) : null
   const scoreChange = preScore !== null && postScore !== null ? postScore - preScore : null

@@ -1,4 +1,5 @@
 import type { Submission } from "../../lib/assessments"
+import type { Person } from "../../lib/classroom"
 import { formatChange, needsReview, relativeDate, summarizeLearners } from "../../lib/progress"
 
 const kindLabel = (s: Submission) =>
@@ -7,24 +8,26 @@ const kindLabel = (s: Submission) =>
 /** Tutor/admin home: real counts and the recordings still waiting for review. */
 export default function TutorDashboard({
   submissions,
+  people,
   error,
   onReview,
 }: {
   submissions: Submission[] | null
+  people?: Person[] | null
   error: string | null
   onReview: (submissionId: string | null) => void
 }) {
   if (error) return <p className="rounded-2xl bg-red-50 p-5 text-sm text-red-700">{error}</p>
   if (!submissions) return <p className="text-slate-500">Loading your learners…</p>
 
-  const learners = summarizeLearners(submissions)
+  const learners = summarizeLearners(submissions, people)
   const pending = submissions.filter(needsReview)
   const completed = submissions.filter((s) => s.status === "completed").length
   const changes = learners.map((l) => l.journey.comparison.scoreChange).filter((c): c is number => c !== null)
   const average = changes.length ? changes.reduce((a, b) => a + b, 0) / changes.length : null
 
   const stats: [string, string, string, string][] = [
-    ["👥", "Active Learners", String(learners.length), "bg-kez-blue-light"],
+    ["👥", "Learners", String(learners.length), "bg-kez-blue-light"],
     ["🎧", "Pending Reviews", String(pending.length), "bg-kez-yellow-light"],
     ["✓", "Recordings Analyzed", String(completed), "bg-green-50"],
     ["↗", "Average Improvement", average === null ? "—" : `${formatChange(average)} pts`, "bg-pink-50"],
@@ -61,9 +64,11 @@ export default function TutorDashboard({
         <div className="mt-6 grid gap-3">
           {!pending.length && (
             <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-              {learners.length
+              {submissions.length
                 ? "You’re all caught up. 🎉"
-                : "No learner recordings yet. You’ll see recordings from learners assigned to you."}
+                : learners.length
+                  ? "No recordings yet. Assign work under Classwork to get your learners started."
+                  : "No learners yet. An administrator sets each student's tutor under Users."}
             </p>
           )}
           {pending.slice(0, 6).map((s) => (

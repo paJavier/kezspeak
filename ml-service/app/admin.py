@@ -20,7 +20,8 @@ log = logging.getLogger(__name__)
 Role = Literal["student", "tutor", "admin", "super_admin"]
 PROFILE_FIELDS = "id, full_name, email, role, created_at"
 
-ROLE_LABELS = {"student": "Learner", "tutor": "Tutor / Teacher", "admin": "Administrator", "super_admin": "Super Administrator"}
+# Display names (match src/lib/admin.ts). The role values themselves don't change.
+ROLE_LABELS = {"student": "Learner", "tutor": "Tutor / Teacher", "admin": "Staff", "super_admin": "Administrator"}
 ROLE_INTROS = {
     "student": (
         "Kez Tutorial Service has created a KezSpeak learner account for you. KezSpeak is where you will "
@@ -31,19 +32,19 @@ ROLE_INTROS = {
         "assigned learners' recorded speaking assessments, provide feedback, and follow their progress."
     ),
     "admin": (
-        "Kez Tutorial Service has created a KezSpeak administrator account for you. You will be able to "
+        "Kez Tutorial Service has created a KezSpeak staff account for you. You will be able to "
         "oversee learners, tutors and speaking assessments across the platform."
     ),
     "super_admin": (
-        "Kez Tutorial Service has created a KezSpeak super administrator account for you. You will be able to "
-        "manage user accounts, tutor assignments and speaking tasks, in addition to all administrator functions."
+        "Kez Tutorial Service has created a KezSpeak administrator account for you. You will be able to "
+        "manage user accounts, each student's tutor and speaking tasks, in addition to all staff functions."
     ),
 }
 
 
 def require_super_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     if user.role != "super_admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a super admin can manage accounts.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an administrator can manage accounts.")
     return user
 
 
@@ -145,7 +146,7 @@ def create_user(body: NewUser, _: CurrentUser = Depends(require_super_admin)) ->
 def update_user(user_id: str, body: UserUpdate, me: CurrentUser = Depends(require_super_admin)) -> dict:
     _profile(user_id)
     if user_id == me.id and body.role is not None and body.role != "super_admin":
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You can't remove your own super admin role.")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You can't remove your own administrator role.")
 
     client = db.get_client()
     auth_changes: dict = {}

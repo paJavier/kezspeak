@@ -1,4 +1,5 @@
 import type { Submission } from "../../lib/assessments"
+import type { Person } from "../../lib/classroom"
 import { formatChange, formatScore, summarizeLearners } from "../../lib/progress"
 
 const fmt = (value: number | null, unit: string) =>
@@ -7,27 +8,36 @@ const fmt = (value: number | null, unit: string) =>
 /** Pre/post comparison for one learner (paper formulas), with a learner picker. */
 export default function LearnerProgress({
   submissions,
+  people,
   error,
   learnerId,
   onSelect,
+  onBack,
 }: {
   submissions: Submission[] | null
+  people?: Person[] | null
   error: string | null
   learnerId: string | null
   onSelect: (learnerId: string) => void
+  onBack?: () => void
 }) {
   if (error) return <p className="rounded-2xl bg-red-50 p-5 text-sm text-red-700">{error}</p>
   if (!submissions) return <p className="text-slate-500">Loading…</p>
 
-  const learners = summarizeLearners(submissions)
+  const learners = summarizeLearners(submissions, people)
   if (!learners.length) {
-    return <p className="rounded-3xl bg-white p-6 text-sm text-slate-500 shadow-sm">No learner data yet. Progress appears once assigned learners submit recordings.</p>
+    return <p className="rounded-3xl bg-white p-6 text-sm text-slate-500 shadow-sm">No learners yet. An administrator sets each student's tutor under Users.</p>
   }
   const current = learners.find((l) => l.learnerId === learnerId) ?? learners[0]
   const { comparison, preScore, postScore } = current.journey
 
-  return (
-    <section>
+  const header = (
+    <>
+      {onBack && (
+        <button onClick={onBack} className="mb-4 block text-sm font-bold text-kez-blue">
+          ← All learners
+        </button>
+      )}
       <select
         value={current.learnerId}
         onChange={(e) => onSelect(e.target.value)}
@@ -39,6 +49,23 @@ export default function LearnerProgress({
           </option>
         ))}
       </select>
+    </>
+  )
+
+  if (!current.submissions.length) {
+    return (
+      <section>
+        {header}
+        <p className="rounded-3xl bg-white p-6 text-sm text-slate-500 shadow-sm">
+          {current.name} hasn't recorded anything yet. Progress appears after their pre-assessment. Assign it under Classwork.
+        </p>
+      </section>
+    )
+  }
+
+  return (
+    <section>
+      {header}
 
       <div className="rounded-3xl bg-kez-blue p-5 text-white sm:p-8">
         <p className="text-sm font-bold uppercase text-kez-yellow">{current.name} · Speaking progress</p>

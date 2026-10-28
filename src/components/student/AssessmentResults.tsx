@@ -25,6 +25,7 @@ function Comparison({ submissions }: { submissions: Submission[] }) {
   return (
     <section className="rounded-3xl bg-white p-7 shadow-sm">
       <p className="text-sm font-bold text-kez-blue">PRE vs POST ASSESSMENT</p>
+      <p className="mt-1 text-xs text-slate-500">Machine-generated estimate, reviewed by your tutor. Not an official proficiency level.</p>
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl bg-kez-blue-light p-5">
           <p className="text-xs font-bold text-slate-500">Pre-assessment</p>

@@ -27,7 +27,20 @@ button { cursor: pointer; }
    component, this remaps those classes in one place. `text-white` and the
    brand blue/yellow fills are intentionally untouched (buttons, sidebar).
    ------------------------------------------------------------------------- */
+/* Chart colors (Statistics page). Status colors always ship with a text label. */
+:root {
+  --viz-bar: #2a78d6;
+  --viz-good: #0ca30c;
+  --viz-warn: #fab219;
+  --viz-crit: #d03b3b;
+  --viz-neutral: #94a3b8;
+  --viz-grid: #e2e8f0;
+}
+
 .dark {
+  --viz-bar: #3987e5;
+  --viz-neutral: #64748b;
+  --viz-grid: #26324a;
   color-scheme: dark;
   --dk-page: #0b1120;
   --dk-card: #111a2e;
@@ -50,6 +63,7 @@ button { cursor: pointer; }
 .dark .bg-slate-100 { background-color: var(--dk-raised); }
 .dark :is(.bg-kez-blue-light, .hover\:bg-kez-blue-light:hover) { background-color: #18254a; }
 .dark :is(.bg-blue-50, .bg-blue-100) { background-color: #1b2c5c; }
+.dark .bg-blue-50\/70 { background-color: rgb(27 44 92 / 0.7); }
 .dark .bg-kez-yellow-light { background-color: #33290b; }
 .dark .bg-amber-50 { background-color: #2f2309; }
 .dark .bg-amber-100 { background-color: #44310b; }

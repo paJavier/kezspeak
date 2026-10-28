@@ -5,10 +5,17 @@ const kindLabels: Record<TaskKind, string> = { pre: "Pre-Assessment", post: "Pos
 const icons: Record<TaskKind, string> = { pre: "🎯", post: "🏁", practice: "🎙️" }
 
 /**
- * Speaking tasks from the database (managed by super admins under Tasks).
+ * Speaking tasks from the database (managed by tutors and admins under Tasks).
  * Learners get a Start button; tutors see the catalog read-only.
  */
-export default function TaskCatalog({ onStart }: { onStart?: (taskId: string) => void }) {
+export default function TaskCatalog({
+  onStart,
+  openTaskIds,
+}: {
+  onStart?: (taskId: string) => void
+  /** Learner view: pre/post tasks appear only when assigned (open assignment). */
+  openTaskIds?: Set<string>
+}) {
   const [tasks, setTasks] = useState<AssessmentTask[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<TaskKind | "all">("all")
@@ -22,7 +29,9 @@ export default function TaskCatalog({ onStart }: { onStart?: (taskId: string) =>
   if (error) return <p className="rounded-2xl bg-red-50 p-5 text-sm text-red-700">{error}</p>
   if (!tasks) return <p className="text-slate-500">Loading activities…</p>
 
-  const visible = tasks.filter((t) => filter === "all" || t.kind === filter)
+  const visible = tasks.filter(
+    (t) => (filter === "all" || t.kind === filter) && (!openTaskIds || t.kind === "practice" || openTaskIds.has(t.id)),
+  )
 
   return (
     <>
@@ -40,7 +49,9 @@ export default function TaskCatalog({ onStart }: { onStart?: (taskId: string) =>
       </div>
       {!visible.length ? (
         <p className="mt-6 rounded-3xl bg-white p-6 text-sm text-slate-500 shadow-sm">
-          No speaking tasks here yet. A super admin can add them under Tasks.
+          {openTaskIds && (filter === "pre" || filter === "post")
+            ? "Your tutor hasn't assigned this assessment yet. It will appear here once they do."
+            : "No speaking tasks here yet. A tutor or admin can add them under Tasks."}
         </p>
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

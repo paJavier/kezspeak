@@ -18,9 +18,9 @@ export type UserNotification = {
 
 const roleDestinations: Record<NotificationRole, ReadonlySet<string>> = {
   student: new Set(["activities", "assessment", "results", "feedback", "announcements", "notifications", "profile"]),
-  tutor: new Set(["review", "submissions", "learners", "announcements", "notifications", "profile"]),
-  admin: new Set(["announcements", "notifications", "profile"]),
-  super_admin: new Set(["announcements", "notifications", "assignments", "users", "tasks", "profile"]),
+  tutor: new Set(["review", "submissions", "learners", "classwork", "tasks", "announcements", "notifications", "profile"]),
+  admin: new Set(["review", "submissions", "learners", "announcements", "notifications", "classwork", "tasks", "profile"]),
+  super_admin: new Set(["review", "submissions", "learners", "announcements", "notifications", "classwork", "users", "tasks", "profile"]),
 }
 
 /** Notification rows contain only internal page keys; arbitrary URLs are rejected. */

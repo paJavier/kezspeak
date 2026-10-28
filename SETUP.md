@@ -19,6 +19,7 @@ You need **both** the web app and the ML service running. Without the ML service
 | Tool | Version | Notes |
 |---|---|---|
 | Git | any | |
+| Git LFS | any | Downloads the model files. Run `git lfs install` once **before** cloning (if you forgot, run `git lfs pull` afterwards) |
 | Node.js | **22** | https://nodejs.org. Check with `node -v` |
 | Python | **3.11** | https://www.python.org/downloads/. On the first installer screen tick **"Add python.exe to PATH"**. The Microsoft Store "python" will not work. |
 | Java (optional) | 17+ | Only for grammar-error counts. Skip it on low-RAM laptops (see §6) |
@@ -28,10 +29,12 @@ You need **both** the web app and the ML service running. Without the ML service
 ## 3. Get the code
 
 ```powershell
+git lfs install
 git clone https://github.com/paJavier/kezspeak.git
 cd kezspeak
-git checkout wip/preexisting-auth-changes   # or main, once the PR is merged
 ```
+
+Everything is on `main`. If you cloned earlier, update with `git checkout main` and then `git pull`.
 
 ## 4. Create your `.env.local` (keys)
 
@@ -117,8 +120,17 @@ The SQL files are **not on GitHub** (`supabase/migrations/` is git-ignored). If 
 | `20261025_ai_comparisons.sql` | Tutor-only model-vs-Gemini comparison |
 | `20261026_super_admin.sql` | `super_admin` role, role-change guard |
 | `20261027_profile_on_signup.sql` | Creates a profile for every new account automatically |
+| `20261027b_notifications.sql` | Notifications, announcements, notification triggers, realtime |
+| `20261028_classwork.sql` | Tutor rosters, assignment deadlines, grades, missing-work marking |
+| `20261029_statistics.sql` | Sign-up dates for the Statistics page |
+| `20261030_simplify.sql` | One tutor per student, set from the Users page |
+| `20261031_notification_fixes.sql` | Notifications follow each student's tutor (practice recordings, feedback, announcements) |
+| `20261031b_fix_signup.sql` | Removes a duplicate sign-up trigger that made every account creation fail |
+| `20261031c_announcement_policy.sql` | Records the live rule that only admins publish announcements |
+| `20261101_research_guards.sql` | Pre/post only when assigned, task permissions, re-assigning practice |
+| `20261101b_guard_order.sql` | Duplicate-assignment check no longer reveals other students' tasks to unauthorized users |
 
-Make someone super admin (SQL editor):
+Make someone an Administrator (SQL editor; the database value is `super_admin`):
 
 ```sql
 update public.profiles set role = 'super_admin' where email = 'their@email.com';
@@ -138,9 +150,9 @@ update public.profiles set role = 'super_admin' where email = 'their@email.com';
 
 ## 9. Try the full flow
 
-1. Log in as a **super admin**. You'll see Users, Assignments and Tasks in the sidebar.
+1. Log in as an **Administrator** (database role `super_admin`). You'll see Users in the sidebar.
 2. **Users → Create an account.** Leave "Send an invite email" on (needs §8) or untick it and set a temporary password. Create one **Tutor / Teacher** and one **Student**.
-3. **Assignments:** link the student to the tutor through a task. Tutors only see learners assigned to them.
+3. **Users → set the student's tutor** with the "Tutor" dropdown. Tutors only see their own students. Then, as the tutor, **Classwork → + Create assignment**.
 4. Log in as the **student** → Speaking Activities → Start → record about 30–60 s → Submit. The status moves through *Transcribing → Measuring → Scoring → Ready* (20–30 s).
 5. Log in as the **tutor** → Submissions → open the recording. You'll see the audio, transcript, metrics, machine estimate and **AI comparison**; add feedback or adjust the score.
 6. The student sees the tutor's feedback under Results and Feedback.

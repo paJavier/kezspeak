@@ -6,7 +6,19 @@ const input = "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outli
 const kindLabels: Record<TaskKind, string> = { pre: "Pre-Assessment", post: "Post-Assessment", practice: "Practice" }
 const EMPTY: TaskInput = { title: "", prompt: "", skill_focus: "", kind: "practice", duration_seconds: 60 }
 
-function TaskForm({ task, onDone }: { task: AssessmentTask | null; onDone: () => void }) {
+function TaskForm({
+  task,
+  onDone,
+  currentUserId,
+  isAdmin,
+}: {
+  task: AssessmentTask | null
+  onDone: () => void
+  currentUserId: string
+  isAdmin: boolean
+}) {
+  // Pre/post prompts are standardized for the research; only admins set them.
+  const kinds = (Object.keys(kindLabels) as TaskKind[]).filter((k) => isAdmin || k === "practice")
   const [form, setForm] = useState<TaskInput>(task ? { ...task, skill_focus: task.skill_focus ?? "" } : EMPTY)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -19,6 +31,7 @@ function TaskForm({ task, onDone }: { task: AssessmentTask | null; onDone: () =>
       await saveTask(
         { ...form, title: form.title.trim(), prompt: form.prompt.trim(), skill_focus: form.skill_focus?.trim() || null },
         task?.id,
+        currentUserId,
       )
       onDone()
     } catch (err) {
@@ -43,7 +56,7 @@ function TaskForm({ task, onDone }: { task: AssessmentTask | null; onDone: () =>
         <input placeholder="Skill focus (optional)" value={form.skill_focus ?? ""} onChange={(e) => setForm({ ...form, skill_focus: e.target.value })} className={input} />
         <div className="grid gap-3 sm:grid-cols-2">
           <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as TaskKind })} className={input}>
-            {(Object.keys(kindLabels) as TaskKind[]).map((kind) => (
+            {kinds.map((kind) => (
               <option key={kind} value={kind}>
                 {kindLabels[kind]}
               </option>
@@ -78,8 +91,12 @@ function TaskForm({ task, onDone }: { task: AssessmentTask | null; onDone: () =>
   )
 }
 
-/** Create, edit and delete the standardized pre/post/practice speaking tasks. */
-export default function TaskManagement() {
+/**
+ * Create, edit and delete speaking tasks. Admins manage everything, including
+ * the standardized pre/post tasks; tutors manage only practice tasks they created.
+ */
+export default function TaskManagement({ currentUserId, isAdmin }: { currentUserId: string; isAdmin: boolean }) {
+  const canChange = (task: AssessmentTask) => isAdmin || (task.kind === "practice" && task.created_by === currentUserId)
   const [tasks, setTasks] = useState<AssessmentTask[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<AssessmentTask | null>(null)
@@ -120,17 +137,25 @@ export default function TaskManagement() {
                 {task.duration_seconds}s{task.skill_focus ? ` · ${task.skill_focus}` : ""}
               </p>
             </div>
-            <button onClick={() => setEditing(task)} className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
-              Edit
-            </button>
-            <button onClick={() => remove(task)} className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700">
-              Delete
-            </button>
+            {canChange(task) ? (
+              <>
+                <button onClick={() => setEditing(task)} className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  Edit
+                </button>
+                <button onClick={() => remove(task)} className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700">
+                  Delete
+                </button>
+              </>
+            ) : (
+              <span className="text-[11px] text-slate-400" title="Pre/post and other tutors' tasks are managed by an administrator">
+                View only
+              </span>
+            )}
           </div>
         ))}
         {tasks && !tasks.length && <p className="text-sm text-slate-500">No tasks yet.</p>}
       </section>
-      <TaskForm key={editing?.id ?? "new"} task={editing} onDone={reload} />
+      <TaskForm key={editing?.id ?? "new"} task={editing} onDone={reload} currentUserId={currentUserId} isAdmin={isAdmin} />
     </div>
   )
 }

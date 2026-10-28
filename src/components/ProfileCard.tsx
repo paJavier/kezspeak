@@ -5,8 +5,8 @@ import ChangePasswordForm from "./ChangePasswordForm"
 const roleLabels: Record<Profile["role"], string> = {
   student: "Learner",
   tutor: "Tutor / Teacher",
-  admin: "Admin",
-  super_admin: "Super Admin",
+  admin: "Staff",
+  super_admin: "Administrator",
 }
 
 /** The signed-in user's real profile plus a couple of counts from their data. */

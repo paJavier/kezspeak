@@ -1,5 +1,6 @@
 import { useState } from "react"
 import type { Submission } from "../../lib/assessments"
+import type { Person } from "../../lib/classroom"
 import { formatChange, formatScore, relativeDate, statusStyles, summarizeLearners } from "../../lib/progress"
 
 const FILTERS = ["All", "Needs review", "Improving", "Needs attention", "Not assessed yet"] as const
@@ -7,10 +8,14 @@ const FILTERS = ["All", "Needs review", "Improving", "Needs attention", "Not ass
 /** One row per learner the tutor can see, with real pre/post scores. */
 export default function LearnerOverview({
   submissions,
+  people,
+  peopleError,
   error,
   onOpen,
 }: {
   submissions: Submission[] | null
+  people?: Person[] | null
+  peopleError?: string | null
   error: string | null
   onOpen: (learnerId: string) => void
 }) {
@@ -21,13 +26,19 @@ export default function LearnerOverview({
   if (!submissions) return <p className="text-slate-500">Loading learners…</p>
 
   const q = query.trim().toLowerCase()
-  const rows = summarizeLearners(submissions).filter(
+  const all = summarizeLearners(submissions, people)
+  const rows = all.filter(
     (l) => (filter === "All" || l.status === filter) && (!q || l.name.toLowerCase().includes(q)),
   )
 
   return (
     <>
       <p className="text-slate-500">Monitor speaking performance and provide targeted feedback.</p>
+      {peopleError && (
+        <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+          Only learners with recordings are shown. Couldn't load the full learner list: {peopleError}
+        </p>
+      )}
       <div className="mt-6 flex flex-wrap gap-2 sm:mt-7 sm:gap-3">
         <input
           value={query}
@@ -77,7 +88,7 @@ export default function LearnerOverview({
             {!rows.length && (
               <tr>
                 <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                  {submissions.length ? "No learners match." : "No learners yet. Learners appear here once they’re assigned to you and submit a recording."}
+                  {all.length ? "No learners match." : "No learners yet. An administrator sets each student's tutor under Users."}
                 </td>
               </tr>
             )}

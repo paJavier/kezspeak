@@ -9,6 +9,7 @@ import {
   type ManagedUser,
   type Role,
 } from "../../lib/admin"
+import { listRoster, setLearnerTutor, tutorOf, type RosterLink } from "../../lib/classroom"
 
 const ROLES = Object.keys(roleLabels) as Role[]
 const input = "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-kez-blue"
@@ -97,7 +98,19 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
   )
 }
 
-function UserRow({ user, isMe, onChanged }: { user: ManagedUser; isMe: boolean; onChanged: () => void }) {
+function UserRow({
+  user,
+  isMe,
+  tutors,
+  tutorId,
+  onChanged,
+}: {
+  user: ManagedUser
+  isMe: boolean
+  tutors: ManagedUser[]
+  tutorId: string | null
+  onChanged: () => void
+}) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(user.full_name)
   const [password, setPassword] = useState("")
@@ -158,6 +171,23 @@ function UserRow({ user, isMe, onChanged }: { user: ManagedUser; isMe: boolean; 
           </b>
           <span className="text-xs text-slate-500">{user.email}</span>
         </div>
+        {user.role === "student" && (
+          <select
+            value={tutorId ?? ""}
+            disabled={busy}
+            title="This student's tutor"
+            aria-label={`Tutor for ${user.full_name}`}
+            onChange={(e) => run(() => setLearnerTutor(user.id, e.target.value || null))}
+            className="rounded-xl border border-slate-200 px-2 py-1 text-xs outline-none disabled:opacity-70"
+          >
+            <option value="">Tutor: none</option>
+            {tutors.map((t) => (
+              <option key={t.id} value={t.id}>
+                Tutor: {t.full_name}
+              </option>
+            ))}
+          </select>
+        )}
         <select
           value={user.role}
           disabled={busy || isMe}
@@ -211,6 +241,7 @@ function UserRow({ user, isMe, onChanged }: { user: ManagedUser; isMe: boolean; 
 /** Super-admin account management: create, list, edit, change role, delete. */
 export default function UserManagement({ currentUserId }: { currentUserId: string }) {
   const [users, setUsers] = useState<ManagedUser[] | null>(null)
+  const [roster, setRoster] = useState<RosterLink[]>([])
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all")
@@ -218,13 +249,16 @@ export default function UserManagement({ currentUserId }: { currentUserId: strin
   const reload = () => setVersion((v) => v + 1)
 
   useEffect(() => {
-    listUsers()
-      .then((data) => {
+    Promise.all([listUsers(), listRoster()])
+      .then(([data, links]) => {
         setUsers(data)
+        setRoster(links)
         setError(null)
       })
       .catch((err: Error) => setError(err.message))
   }, [version])
+
+  const tutors = (users ?? []).filter((u) => u.role === "tutor")
 
   const q = query.trim().toLowerCase()
   const visible = (users ?? []).filter(
@@ -247,13 +281,24 @@ export default function UserManagement({ currentUserId }: { currentUserId: strin
             ))}
           </select>
         </div>
+        <p className="mt-3 text-xs text-slate-500">Set each student's tutor. Tutors only see, assign work to and grade their own students.</p>
         {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         {!users && !error && <p className="mt-4 text-sm text-slate-500">Loading accounts…</p>}
         {users && (
           <div className="mt-2">
-            {visible.map((user) => (
-              <UserRow key={`${user.id}-${user.role}-${user.full_name}`} user={user} isMe={user.id === currentUserId} onChanged={reload} />
-            ))}
+            {visible.map((user) => {
+              const tutorId = tutorOf(roster, user.id)
+              return (
+                <UserRow
+                  key={`${user.id}-${user.role}-${user.full_name}-${tutorId}`}
+                  user={user}
+                  isMe={user.id === currentUserId}
+                  tutors={tutors}
+                  tutorId={tutorId}
+                  onChanged={reload}
+                />
+              )
+            })}
             {!visible.length && <p className="py-4 text-sm text-slate-500">No accounts match.</p>}
           </div>
         )}
