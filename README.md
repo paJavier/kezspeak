@@ -164,16 +164,22 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 > **Rule:** anything starting with `VITE_` is shipped to every visitor's browser. A secret must **never** get a `VITE_` prefix.
 
+> **You need two terminals, both open at the same time.** The web app and the ML service each keep their terminal busy while they run, so there is no prompt left to type the next command. Don't press Ctrl+C in one to free it up, because that stops the server. Open a second terminal instead: in VS Code, click **+** in the terminal panel, or use **Split Terminal**.
+
 ## 4. Run the web app (terminal 1)
+
+From the project root (the `kezspeak` folder, not `ml-service`):
 
 ```powershell
 npm install
 npm run dev
 ```
 
-Open **http://localhost:8443**. The page reloads automatically when you save a file.
+Open **http://localhost:8443**. The page reloads automatically when you save a file. Leave this terminal running.
 
 ## 5. Run the ML service (terminal 2)
+
+Open a **new** terminal for this step and keep terminal 1 running.
 
 **First time only:**
 
@@ -191,14 +197,17 @@ cd ml-service
 $env:ENABLE_GRAMMAR="false"; .venv\Scripts\uvicorn app.main:app --port 8000
 ```
 
-- Wait for `Application startup complete.` The first start downloads Whisper, which takes a minute or two.
-- Check http://localhost:8000/health. It should show `"loaded": true`.
+- Wait for `Uvicorn running on http://127.0.0.1:8000`. The first start downloads Whisper, which takes a minute or two.
+- **Leave this terminal alone while you use the app.** The service runs only as long as this terminal stays open and you don't press Ctrl+C.
+- Check http://localhost:8000/health. It should show `"loaded": true`. If the page doesn't load, the service isn't running.
+- The XGBoost warning about "loading a serialized model" is expected and harmless. `Scoring model loaded` on the next line means the model loaded fine.
+- When you press Ctrl+C, uvicorn prints a `KeyboardInterrupt` / `CancelledError` traceback. That's a normal shutdown, not a crash.
 - If you installed Java and have RAM to spare, leave out `$env:ENABLE_GRAMMAR="false";` to get grammar counts.
 - Add `--reload` to restart the service automatically when you edit Python files.
 
 > **macOS/Linux:** use `python3`, and `.venv/bin/` instead of `.venv\Scripts\`. Start the service with `ENABLE_GRAMMAR=false .venv/bin/uvicorn app.main:app --port 8000`.
 
-Keep **both terminals open** while you use the app.
+Keep **both terminals open** while you use the app. To stop everything, press Ctrl+C in each terminal.
 
 ## 6. Log in and try it
 
@@ -322,7 +331,7 @@ $env:ENABLE_GRAMMAR="false"; .venv\Scripts\python -m pytest
 
 | Problem | Fix |
 |---|---|
-| "The assessment service is not reachable" / Users page won't load | The ML service isn't running. Start it (step 5) |
+| "The KezSpeak server (ml-service) is not reachable" / "The assessment service is not reachable" / Users page won't load | The ML service isn't running. Usually it was stopped with Ctrl+C or its terminal was closed, often to run `npm run dev` in the same terminal. Start it again in its own terminal (step 5) and check http://localhost:8000/health |
 | ML service: model can't be loaded / unpickling error | Git LFS wasn't on when you cloned. Run `git lfs install` then `git lfs pull` |
 | `mkl_malloc: failed to allocate memory` / `MemoryError` | Out of RAM. Close other apps and use `ENABLE_GRAMMAR=false` |
 | `npm run dev` or the build crashes with exit code 134 | Out of memory. Close apps or stop the ML service briefly |
@@ -332,7 +341,8 @@ $env:ENABLE_GRAMMAR="false"; .venv\Scripts\python -m pytest
 | AI comparison: "Gemini is unavailable" | Google is busy or the key is missing. Wait and retry, and check `GEMINI_API_KEY` |
 | CORS error calling `localhost:8000` | Your web app runs on a port not listed in `ALLOWED_ORIGINS`. Add it to `.env.local` |
 | `Port 8443 is already in use` | Another dev server is running. Close it |
-| `python` not found / opens the Microsoft Store | Reinstall Python 3.11 from python.org with "Add to PATH" ticked |
+| `python` not found / opens the Microsoft Store / "The file cannot be accessed by the system" | That's the Windows Store placeholder. Reinstall Python 3.11 from python.org with "Add to PATH" ticked, or turn off the `python.exe` entries under Settings → Apps → Advanced app settings → App execution aliases. Once `.venv` exists, the ML service doesn't need plain `python` |
+| `cd ml-service` says the path doesn't exist | You're already inside `ml-service`. Check the path shown in the prompt |
 
 More fixes are in [SETUP.md §10](SETUP.md#10-troubleshooting).
 
