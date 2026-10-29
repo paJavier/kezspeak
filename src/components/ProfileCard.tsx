@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react"
 import type { Submission } from "../lib/assessments"
+import { fetchMyTutor } from "../lib/classroom"
 import type { Profile } from "../lib/supabase"
 import ChangePasswordForm from "./ChangePasswordForm"
 import ExamGoalCard from "./ExamGoalCard"
@@ -13,6 +15,16 @@ const roleLabels: Record<Profile["role"], string> = {
 /** The signed-in user's real profile plus a couple of counts from their data. */
 export default function ProfileCard({ profile, submissions }: { profile: Profile; submissions: Submission[] | null }) {
   const isLearner = profile.role === "student"
+  // Learners see who their tutor is (set by a super admin on the Users page).
+  const [tutor, setTutor] = useState<string>("Loading…")
+  useEffect(() => {
+    if (!isLearner) return
+    let active = true
+    fetchMyTutor(profile.id)
+      .then((person) => { if (active) setTutor(person?.full_name ?? "Not assigned yet") })
+      .catch(() => { if (active) setTutor("Couldn't load") })
+    return () => { active = false }
+  }, [isLearner, profile.id])
   const list = submissions ?? []
   const stats: [string, string][] = isLearner
     ? [
@@ -27,6 +39,7 @@ export default function ProfileCard({ profile, submissions }: { profile: Profile
     ["Full name", profile.full_name ?? "—"],
     ["Email", profile.email ?? "—"],
     ["Role", roleLabels[profile.role]],
+    ...(isLearner ? [["Tutor", tutor] as [string, string]] : []),
   ]
 
   return (
@@ -65,7 +78,7 @@ export default function ProfileCard({ profile, submissions }: { profile: Profile
               </div>
             ))}
           </dl>
-          <p className="mt-3 text-xs text-slate-400">To change your name or role, ask an administrator.</p>
+          <p className="mt-3 text-xs text-slate-400">To change your name or role, ask an administrator.{isLearner && " An administrator also sets your tutor."}</p>
         </section>
 
         <section className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">

@@ -1,13 +1,13 @@
 # KezSpeak: deployment checklist
 
-Target: **Vercel** (web app) + **Render** (ml-service) + the existing hosted **Supabase** project.
+Target: **Vercel** (web app) + a **Hugging Face Space** (ml-service) + the existing hosted **Supabase** project.
 Work top to bottom and tick each box. Anything marked ⚠ blocks go-live.
 
 ```
 Browser ──► Vercel (Vite build, VITE_* only)
    │  Supabase JWT
    ├──────► Supabase (Postgres + Auth + Storage, RLS)
-   └──────► Render: ml-service (Whisper, features, XGBoost, Gemini) ──► Supabase (service role)
+   └──────► HF Space: ml-service (Whisper, features, XGBoost, Gemini) ──► Supabase (service role)
 Supabase Edge Function (AI fallback feedback) ──► Gemini / ml-service
 ```
 
@@ -17,7 +17,7 @@ Supabase Edge Function (AI fallback feedback) ──► Gemini / ml-service
 - [ ] ⚠ `npm run build` passes
 - [ ] ⚠ `cd ml-service; .venv\Scripts\python -m pytest` passes
 - [ ] `git status` is clean and `main` is pushed
-- [ ] `git lfs ls-files` lists both `ml-service/model/*.pkl` files (the host must get the real files, not LFS pointers)
+- [ ] ⚠ `git lfs ls-files` lists nothing under `public/` or `ml-service/model/` (`.gitattributes` excludes them). Vercel builds from a plain clone and would serve 130-byte LFS pointers instead of images
 - [ ] No secrets in source: `git grep -nE "service_role|AIza|sk_live"` finds nothing. Only the public **anon** key has ever appeared in git history (checked 29 Oct 2026); that key is public by design.
 - [ ] `utils/supabase/info.tsx` still reads env vars (Figma Make can regenerate it with literal values)
 
@@ -33,20 +33,21 @@ Supabase Edge Function (AI fallback feedback) ──► Gemini / ml-service
 - [ ] ⚠ Custom SMTP is enabled (built-in mail only reaches team members). See SETUP.md §8.
 - [ ] Email templates (invite, recovery) are pasted in
 - [ ] Edge Function `make-server-8450f8e5` is deployed: `supabase functions deploy make-server-8450f8e5`
-- [ ] Edge Function secrets are set: `GEMINI_API_KEY`, `KEZSPEAK_ML_URL` (the Render URL), `KEZSPEAK_API_KEY`
+- [ ] Edge Function secrets are set: `GEMINI_API_KEY`, `KEZSPEAK_ML_URL` (the Space URL), `KEZSPEAK_API_KEY`
 - [ ] Backups: confirm the plan's daily backups, or export the schema and data before launch
 
-## 3. Render: ml-service
+## 3. Hugging Face Space: ml-service
 
-- [ ] New **Web Service** from the GitHub repo, **Root Directory** `ml-service`
-- [ ] Runtime Python **3.11** (set `PYTHON_VERSION=3.11.11`)
-- [ ] Build: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
-- [ ] Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- [ ] ⚠ Instance with **at least 2 GB RAM** (Whisper small + XGBoost + spaCy). The free 512 MB tier cannot load Whisper.
-- [ ] Grammar counts need Java. Render's native Python runtime has no Java, so either:
-  - set `ENABLE_GRAMMAR=false` (grammar error count is then missing from the NLP features; the score is audio-only and unaffected), or
-  - deploy with a Dockerfile that installs a JRE 17
-- [ ] Environment variables (no `VITE_` prefix, never in the frontend):
+Free CPU Space (16 GB RAM, Docker). `ml-service/Dockerfile` installs Java (grammar counts), spaCy's model, and pre-downloads Whisper small and LanguageTool at build time.
+
+- [ ] On huggingface.co: **New Space** → SDK **Docker** → hardware **CPU basic** (free) → visibility **Public** (the browser calls it directly; secrets stay hidden)
+- [ ] `hf auth login` with a **write** token
+- [ ] Upload from the repo root (uses your working copy, so the real `.pkl` files go up):
+  ```
+  hf upload <user>/<space> ml-service . --repo-type space
+  hf upload <user>/<space> ml-service/hf-space.md README.md --repo-type space
+  ```
+- [ ] Space → Settings → **Variables and secrets** (secrets, no `VITE_` prefix, never in the frontend):
 
   | Name | Value |
   |---|---|
@@ -55,11 +56,10 @@ Supabase Edge Function (AI fallback feedback) ──► Gemini / ml-service
   | `KEZSPEAK_API_KEY` | `python -c "import secrets; print(secrets.token_hex(32))"`, same value as the Edge Function secret |
   | `GEMINI_API_KEY` | Google AI Studio key (AI comparison, activity drafts) |
   | `ALLOWED_ORIGINS` | the Vercel URL(s), comma-separated, no trailing slash |
-  | `ENABLE_GRAMMAR` | `false` unless Java is installed |
 
-- [ ] ⚠ `https://<render-url>/health` returns `"status": "ok"` and the model shows as loaded
-- [ ] Health check path set to `/health`
-- [ ] Note: a restart marks in-flight recordings as **failed (retryable)**; learners and tutors can retry without recording again. Avoid deploying during class hours.
+- [ ] ⚠ `https://<user>-<space>.hf.space/health` returns `"status": "ok"` and the model shows as loaded
+- [ ] Note: a free Space **sleeps after ~48 h without traffic**; the next request wakes it (1–2 min). Recordings sent while it sleeps are saved and can be retried. Open `/health` before a class or demo.
+- [ ] Note: a restart marks in-flight recordings as **failed (retryable)**; learners and tutors can retry without recording again. Avoid redeploying during class hours.
 
 ## 4. Vercel: web app
 
@@ -71,10 +71,11 @@ Supabase Edge Function (AI fallback feedback) ──► Gemini / ml-service
   |---|---|
   | `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` |
   | `VITE_SUPABASE_ANON_KEY` | the **anon** key only |
-  | `VITE_ML_API_URL` | the Render URL, no trailing slash |
+  | `VITE_ML_API_URL` | the Space URL (`https://<user>-<space>.hf.space`), no trailing slash. Build-time: redeploy after changing it |
 
 - [ ] ⚠ Nothing secret is in a `VITE_*` variable (`SUPABASE_SERVICE_ROLE_KEY`, `KEZSPEAK_API_KEY` and `GEMINI_API_KEY` never go here)
-- [ ] After the first deploy, add the final Vercel URL to Render `ALLOWED_ORIGINS` and Supabase Redirect URLs, then redeploy Render
+- [ ] After the first deploy, add the final Vercel URL to the Space's `ALLOWED_ORIGINS` (the Space restarts) and to Supabase Redirect URLs
+- [ ] ⚠ `curl -sI https://<vercel-url>/images/logo-mark.png` shows `Content-Length: 97955`, not ~130 (an LFS pointer)
 
 ## 5. Smoke test on production (one account per role)
 
@@ -112,5 +113,5 @@ Supabase Edge Function (AI fallback feedback) ──► Gemini / ml-service
 
 - [ ] Rotate any key that was shared in chat or email during development (`SUPABASE_SERVICE_ROLE_KEY`, `KEZSPEAK_API_KEY`, `GEMINI_API_KEY`)
 - [ ] Set a Google Cloud budget alert for the Gemini key
-- [ ] Watch Render logs for the first real submissions (STT ≤ 30 s, end-to-end about 60 s or less)
+- [ ] Watch the Space logs for the first real submissions (STT ≤ 30 s, end-to-end about 60 s or less)
 - [ ] Record the production URLs and who holds dashboard access somewhere private

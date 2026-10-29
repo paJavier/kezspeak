@@ -79,6 +79,33 @@ def test_unknown_submission_is_404(client):
     assert client.post("/submissions/nope/process").status_code == 404
 
 
+@pytest.mark.parametrize("rows, expected", [([{"learner_id": LEARNER}], True), ([], False)])
+def test_tutor_link_reads_tutor_learners(monkeypatch, rows, expected):
+    calls = []
+
+    class Query:
+        def table(self, name):
+            calls.append(("table", name))
+            return self
+
+        def select(self, columns):
+            return self
+
+        def eq(self, column, value):
+            calls.append((column, value))
+            return self
+
+        def limit(self, n):
+            return self
+
+        def execute(self):
+            return type("Result", (), {"data": rows})()
+
+    monkeypatch.setattr(db, "get_client", lambda: Query())
+    assert main._tutor_has_learner(TUTOR, LEARNER) is expected
+    assert calls == [("table", "tutor_learners"), ("tutor_id", TUTOR), ("learner_id", LEARNER)]
+
+
 # ---------------------------------------------------------------------------
 # POST /evaluate (server-to-server, API key)
 # ---------------------------------------------------------------------------

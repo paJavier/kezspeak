@@ -165,7 +165,8 @@ export default function RecordActivity({
   /** Pre/post tasks the learner has an open assignment for; others are hidden (the DB refuses them too). */
   openTaskIds?: Set<string>
 }) {
-  const [tasks, setTasks] = useState<AssessmentTask[]>([])
+  // null = still loading; [] = nothing to record yet.
+  const [tasks, setTasks] = useState<AssessmentTask[] | null>(null)
   const [taskId, setTaskId] = useState<string | null>(initialTaskId)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -188,10 +189,26 @@ export default function RecordActivity({
       .catch((err: Error) => setLoadError(err.message))
   }, [])
 
-  const task = tasks.find((t) => t.id === taskId) ?? null
+  const task = tasks?.find((t) => t.id === taskId) ?? null
 
   if (loadError) return <p className="rounded-2xl bg-red-50 p-5 text-sm text-red-700">{loadError}</p>
-  if (!tasks.length) return <p className="text-center text-slate-500">Loading speaking tasks…</p>
+  if (!tasks) return <p className="text-center text-slate-500">Loading speaking tasks…</p>
+  if (!tasks.length) {
+    return (
+      <section className="mx-auto max-w-3xl text-center">
+        {notice && <p className="mb-6 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">{notice}</p>}
+        <div className="rounded-[32px] bg-white p-8 shadow-sm">
+          <h2 className="text-xl font-extrabold">No speaking tasks yet</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+            Your tutor will add practice tasks and assign your assessments when it's time.
+          </p>
+          <button onClick={onViewResults} className="mt-6 rounded-xl bg-kez-blue-light px-6 py-3 text-sm font-bold text-kez-blue">
+            See my results
+          </button>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="mx-auto max-w-3xl text-center">

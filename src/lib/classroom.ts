@@ -49,6 +49,14 @@ export async function fetchMyTutorId(learnerId: string): Promise<string | null> 
   return data?.[0]?.tutor_id ?? null
 }
 
+/** The signed-in student's tutor (name only; kez_list_people hides tutor emails from learners), or null. */
+export async function fetchMyTutor(learnerId: string): Promise<Person | null> {
+  const tutorId = await fetchMyTutorId(learnerId)
+  if (!tutorId) return null
+  const people = await listPeople()
+  return people.find((p) => p.id === tutorId) ?? null
+}
+
 /** A student's tutor (one per student; the roster table allows more, the UI doesn't). */
 export const tutorOf = (roster: RosterLink[], learnerId: string) => roster.find((r) => r.learner_id === learnerId)?.tutor_id ?? null
 

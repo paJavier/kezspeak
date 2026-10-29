@@ -71,10 +71,12 @@ def _authorize(submission_id: str, user: CurrentUser) -> dict:
 
 
 def _tutor_has_learner(tutor_id: str, learner_id: str) -> bool:
+    # The student's tutor comes from the roster, like kez_tutor_has_learner()
+    # in SQL (20261028_classwork.sql), not from assignment rows.
     result = (
         db.get_client()
-        .table("assignments")
-        .select("id")
+        .table("tutor_learners")
+        .select("learner_id")
         .eq("tutor_id", tutor_id)
         .eq("learner_id", learner_id)
         .limit(1)

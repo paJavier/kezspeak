@@ -1,0 +1,11 @@
+.venv
+__pycache__
+.pytest_cache
+tests
+scripts
+*.log
+hs_err_*
+replay_*
+desktop.ini
+**/desktop.ini
+.env*

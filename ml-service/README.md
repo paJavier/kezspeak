@@ -19,6 +19,8 @@ cd ml-service
 
 All keys live in the repo-root **`.env.local`** (gitignored), which the frontend and this service share. `.env.example` at the root lists every variable. Server-only keys (`SUPABASE_SERVICE_ROLE_KEY`, `KEZSPEAK_API_KEY`) have no `VITE_` prefix, so Vite never bundles them. On a deployment host, set the same names as real environment variables instead.
 
+**Deploy:** production runs as a Hugging Face Docker Space built from `Dockerfile` (port 7860), with `hf-space.md` as the Space card. Steps and secrets: [DEPLOYMENT.md §3](../DEPLOYMENT.md#3-hugging-face-space-ml-service).
+
 Java is required for grammar counts (LanguageTool, about 250 MB downloaded on first start). Set `ENABLE_GRAMMAR=false` to skip them.
 
 ### Model files (from Google Drive → `MyDrive/KezSpeak/results/`)

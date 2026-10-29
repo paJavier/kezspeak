@@ -88,8 +88,9 @@ app.post("/make-server-8450f8e5/ai-feedback", async (c) => {
   let allowed = isOwner || user.role === "admin" || user.role === "super_admin";
   if (!allowed && user.role === "tutor") {
     const { data: link } = await admin
-      .from("assignments")
-      .select("id")
+      // The student's tutor comes from the roster (tutor_learners), like kez_tutor_has_learner().
+      .from("tutor_learners")
+      .select("learner_id")
       .eq("tutor_id", user.id)
       .eq("learner_id", submission.learner_id)
       .limit(1);

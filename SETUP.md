@@ -132,6 +132,8 @@ The SQL files are **not on GitHub** (`supabase/migrations/` is git-ignored). If 
 | `20261102_announcement_audience.sql` | Announcements: administrators/moderators pick Everyone, All students or All tutors; tutors post to their own students only |
 | `20261103_require_tutor.sql` | Students get tasks, classwork and recordings only after a super admin sets their tutor |
 | `20261104_exam_goals.sql` | Exam goals (IELTS / TOEFL / Cambridge), tutor rubric scores on feedback, exam-style tasks with preparation time |
+| `20261105_notification_repair.sql` | Students are notified of tutor-created assignments and new practice tasks; re-asserts notification read access and realtime |
+| `20261106_tutor_role_cleanup.sql` | Changing a tutor to another role removes their students; cleans up links left by earlier demotions |
 
 Make someone an Administrator (SQL editor; the database value is `super_admin`):
 

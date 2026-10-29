@@ -1,7 +1,19 @@
 import type { ExamStyle, Rubric } from "./exams"
 import { supabase } from "./supabase"
 
-const ML_API_URL = (import.meta.env.VITE_ML_API_URL || "http://localhost:8000").replace(/\/+$/, "")
+/**
+ * The ML service base URL. Local development falls back to localhost:8000; a
+ * production build without VITE_ML_API_URL returns null instead of quietly
+ * calling the visitor's own machine. Read per call so tests can stub the env.
+ */
+export function mlServiceUrl(): string | null {
+  const configured = import.meta.env.VITE_ML_API_URL?.trim()
+  if (configured) return configured.replace(/\/+$/, "")
+  return import.meta.env.DEV ? "http://localhost:8000" : null
+}
+
+export const ML_NOT_CONFIGURED =
+  "The KezSpeak assessment server isn't set up for this site yet. Ask an administrator to set VITE_ML_API_URL and redeploy."
 const RECORDINGS_BUCKET = "recordings"
 
 export type TaskKind = "pre" | "post" | "practice"
@@ -254,10 +266,12 @@ export async function callMlService<T = unknown>(
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw new Error("Your session has expired. Please log in again.")
+  const baseUrl = mlServiceUrl()
+  if (!baseUrl) throw new Error(ML_NOT_CONFIGURED)
 
   let response: Response
   try {
-    response = await fetch(`${ML_API_URL}${path}`, {
+    response = await fetch(`${baseUrl}${path}`, {
       method: options.method ?? "POST",
       // FormData sets its own multipart Content-Type (with the boundary).
       headers: {

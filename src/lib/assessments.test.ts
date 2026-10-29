@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { daysFromNow, submission } from "../test/fixtures"
 
-vi.mock("./supabase", () => ({ supabase: {} }))
-const { comparePrePost, finalScore } = await import("./assessments")
+vi.mock("./supabase", () => ({
+  supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "token" } } }) } },
+}))
+const { comparePrePost, finalScore, mlServiceUrl, callMlService, ML_NOT_CONFIGURED } = await import("./assessments")
 
 describe("comparePrePost (paper Sec. III.J)", () => {
   it("computes score change and improvement % from pre and post", () => {
@@ -60,5 +62,34 @@ describe("finalScore", () => {
     expect(finalScore(submission({ score: 70 }))).toBe(70)
     expect(finalScore(submission({ score: 70, adjusted: 82 }))).toBe(82)
     expect(finalScore(submission({ score: null }))).toBeNull()
+  })
+})
+
+describe("ML service URL", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("uses VITE_ML_API_URL without a trailing slash", () => {
+    vi.stubEnv("VITE_ML_API_URL", "https://kez-ml.hf.space/")
+    expect(mlServiceUrl()).toBe("https://kez-ml.hf.space")
+  })
+
+  it("falls back to localhost only in development", () => {
+    vi.stubEnv("VITE_ML_API_URL", "")
+    vi.stubEnv("DEV", true)
+    expect(mlServiceUrl()).toBe("http://localhost:8000")
+    vi.stubEnv("DEV", false)
+    expect(mlServiceUrl()).toBeNull()
+  })
+
+  it("a production build without the URL fails clearly instead of calling localhost", async () => {
+    vi.stubEnv("VITE_ML_API_URL", "")
+    vi.stubEnv("DEV", false)
+    const fetchSpy = vi.fn()
+    vi.stubGlobal("fetch", fetchSpy)
+    await expect(callMlService("/health", { method: "GET" })).rejects.toThrow(ML_NOT_CONFIGURED)
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
