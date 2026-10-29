@@ -7,7 +7,7 @@ export type Role = "student" | "tutor" | "admin" | "super_admin"
 export const roleLabels: Record<Role, string> = {
   student: "Student",
   tutor: "Tutor / Teacher",
-  admin: "Staff",
+  admin: "Moderator",
   super_admin: "Administrator",
 }
 
@@ -56,8 +56,16 @@ export type TaskInput = Omit<AssessmentTask, "id">
 
 /** New tasks record their creator; tutors may only change their own practice tasks (RLS). */
 export async function saveTask(task: TaskInput, id?: string, createdBy?: string): Promise<void> {
-  // Never rewrite created_by on update.
-  const { created_by: _ignored, ...fields } = task
+  // Only real task columns; never rewrite created_by on update. The exam fields
+  // are sent only when set, so saving still works before 20261104_exam_goals.sql.
+  const fields = {
+    title: task.title,
+    prompt: task.prompt,
+    skill_focus: task.skill_focus,
+    kind: task.kind,
+    duration_seconds: task.duration_seconds,
+    ...(task.exam_style || task.prep_seconds ? { exam_style: task.exam_style ?? null, prep_seconds: task.prep_seconds ?? 0 } : {}),
+  }
   const { error } = id
     ? await supabase.from("assessment_tasks").update(fields).eq("id", id)
     : await supabase.from("assessment_tasks").insert({ ...fields, created_by: createdBy ?? null })
@@ -74,6 +82,52 @@ export async function deleteTask(id: string): Promise<void> {
     if (error.code === "23503") throw new Error("This task already has recordings, so it can't be deleted.")
     throw new Error(`Could not delete the task: ${error.message}`)
   }
+}
+
+/** AI-drafted speaking task from reference material. Nothing is stored; the tutor edits it first. */
+export type ActivityDraft = {
+  provider: string
+  model: string
+  title: string
+  prompt: string
+  follow_up_questions: string[]
+  skill_focus: string
+  duration_seconds: number
+}
+
+export function generateActivityDraft(file: File, skillFocus?: string, examStyle?: string | null): Promise<ActivityDraft> {
+  const form = new FormData()
+  form.append("file", file)
+  if (skillFocus?.trim()) form.append("skill_focus", skillFocus.trim())
+  if (examStyle) form.append("exam_style", examStyle)
+  return callMlService<ActivityDraft>("/activities/generate", {
+    body: form,
+    unreachable: "The KezSpeak server (ml-service) is not reachable, so activities can't be drafted right now.",
+  }).catch((err: Error) => {
+    // FastAPI's bare 404: the running ml-service predates this endpoint.
+    if (err.message === "Not Found") throw new Error("The KezSpeak server is out of date. Restart ml-service to enable AI drafts.")
+    throw err
+  })
+}
+
+const FOLLOW_UP_HEADING = "Also answer:"
+
+/** Folds follow-up questions into the learner prompt; tasks have no separate column for them. */
+export function draftPrompt(prompt: string, followUps: string[]): string {
+  const questions = followUps.map((q) => q.trim()).filter(Boolean)
+  if (!questions.length) return prompt.trim()
+  return `${prompt.trim()}\n\n${FOLLOW_UP_HEADING}\n${questions.map((q) => `- ${q}`).join("\n")}`
+}
+
+/** Inverse of draftPrompt: splits a trailing "Also answer:" list back into questions. */
+export function splitPrompt(full: string): { prompt: string; followUps: string[] } {
+  const marker = `\n\n${FOLLOW_UP_HEADING}\n`
+  const at = full.lastIndexOf(marker)
+  if (at === -1) return { prompt: full, followUps: [] }
+  const lines = full.slice(at + marker.length).split("\n")
+  // Only a block made entirely of "- " lines is ours; otherwise leave the text alone.
+  if (!lines.length || !lines.every((line) => line.startsWith("- "))) return { prompt: full, followUps: [] }
+  return { prompt: full.slice(0, at), followUps: lines.map((line) => line.slice(2).trim()) }
 }
 
 // Assignments and rosters live in lib/classroom.ts.

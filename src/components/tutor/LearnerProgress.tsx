@@ -1,6 +1,8 @@
 import type { Submission } from "../../lib/assessments"
 import type { Person } from "../../lib/classroom"
 import { formatChange, formatScore, summarizeLearners } from "../../lib/progress"
+import ExamGoalCard from "../ExamGoalCard"
+import ExamProgress from "../ExamProgress"
 
 const fmt = (value: number | null, unit: string) =>
   value === null ? "—" : `${Math.round(value * 100) / 100}${unit ? ` ${unit}` : ""}`
@@ -52,10 +54,18 @@ export default function LearnerProgress({
     </>
   )
 
+  // Keyed by learner so switching learners reloads their goal.
+  const goalCard = (
+    <div className="mb-6">
+      <ExamGoalCard key={current.learnerId} learnerId={current.learnerId} learnerName={current.name} compact />
+    </div>
+  )
+
   if (!current.submissions.length) {
     return (
       <section>
         {header}
+        {goalCard}
         <p className="rounded-3xl bg-white p-6 text-sm text-slate-500 shadow-sm">
           {current.name} hasn't recorded anything yet. Progress appears after their pre-assessment. Assign it under Classwork.
         </p>
@@ -66,6 +76,10 @@ export default function LearnerProgress({
   return (
     <section>
       {header}
+      {goalCard}
+      <div className="mb-6">
+        <ExamProgress key={current.learnerId} submissions={current.submissions} learnerId={current.learnerId} learnerName={current.name} audience="tutor" />
+      </div>
 
       <div className="rounded-3xl bg-kez-blue p-5 text-white sm:p-8">
         <p className="text-sm font-bold uppercase text-kez-yellow">{current.name} · Speaking progress</p>

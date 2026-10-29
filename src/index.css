@@ -103,6 +103,7 @@ button { cursor: pointer; }
 /* Borders and rings */
 .dark .border-slate-50 { border-color: var(--dk-sunken); }
 .dark .border-slate-100 { border-color: var(--dk-line); }
+.dark .divide-slate-100 > :not(:last-child) { border-color: var(--dk-line); }
 .dark .border-slate-200 { border-color: var(--dk-line-strong); }
 .dark .border-slate-300 { border-color: #475569; }
 .dark :is(.border-blue-100, .border-blue-200) { border-color: #1e3a8a; }
@@ -110,10 +111,34 @@ button { cursor: pointer; }
 .dark .border-amber-200 { border-color: #713f12; }
 .dark .border-violet-200 { border-color: #4c3a80; }
 .dark :is(.focus\:border-kez-blue:focus, .hover\:border-kez-blue:hover, .border-kez-blue) { border-color: #5b84f5; }
-.dark .focus\:ring-blue-100:focus { --tw-ring-color: #1e3a8a; }
+.dark :is(.ring-blue-100, .focus\:ring-blue-100:focus) { --tw-ring-color: #1e3a8a; }
+.dark .text-slate-300 { color: #475569; }
+.dark .text-emerald-700 { color: #6ee7b7; }
 
 /* Unstyled form controls follow the theme. */
 .dark :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
   color: var(--dk-text);
 }
 .dark select option { background-color: var(--dk-card); }
+
+/* Printable progress report (components/ProgressReport.tsx): print only the
+   report, always in light colours, whatever theme is on screen. */
+@media print {
+  body * { visibility: hidden; }
+  .print-report, .print-report * { visibility: visible; }
+  .print-report-backdrop { position: static; overflow: visible; background: none; padding: 0; }
+  .print-report {
+    position: absolute;
+    inset: 0 0 auto 0;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    background: #ffffff !important;
+  }
+  .print-report * { color: #0f172a !important; border-color: #e2e8f0 !important; }
+  .print-report .print-bar,
+  .print-report .print-bar-pre { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .print-report .print-bar { background: #1e40af !important; }
+  .print-report .print-bar-pre { background: #94a3b8 !important; }
+  .no-print { display: none !important; }
+}

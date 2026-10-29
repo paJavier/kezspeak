@@ -1,5 +1,9 @@
-import { FormEvent, type ReactNode, useEffect, useState } from "react"
+import { FormEvent, type ReactNode, useEffect, useRef, useState } from "react"
+import { Eye } from "lucide-react"
 import { listTasks, type AssessmentTask, type Submission } from "../../lib/assessments"
+import TaskPreview from "../TaskPreview"
+import { EXAMS, examForStyle, examStyleLabels, type ExamId } from "../../lib/exams"
+import { listGoals, type LearnerGoal } from "../../lib/goals"
 import {
   assignTask,
   classworkState,
@@ -446,19 +450,60 @@ function AssignForm({
   const [due, setDue] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const selectedTask = tasks.find((t) => t.id === taskId)
 
+  // Exam goals of the chosen students: matching exam-style tasks are listed first,
+  // and a pre/post task for a different exam gets a soft warning.
+  const [goals, setGoals] = useState<LearnerGoal[]>([])
+  useEffect(() => {
+    // Goals are optional context here; without the table the form works as before.
+    listGoals().then(setGoals).catch(() => setGoals([]))
+  }, [])
+  const chosenExams = new Set(goals.filter((g) => learnerIds.includes(g.learner_id)).map((g) => g.exam))
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const matches = (t: AssessmentTask) => (chosenExams.has(examForStyle(t.exam_style) as ExamId) ? 0 : 1)
+    return matches(a) - matches(b)
+  })
+  const taskExam = examForStyle(selectedTask?.exam_style)
+  const mismatched =
+    selectedTask && selectedTask.kind !== "practice" && taskExam
+      ? goals.filter((g) => learnerIds.includes(g.learner_id) && g.exam !== taskExam)
+      : []
+
+  // Students get work only once they have a tutor (migration 20261103_require_tutor.sql).
+  const assignable = learners.filter((l) => tutorOf(roster, l.id))
   const toggle = (id: string) => setLearnerIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!learnerIds.length) return setError("Choose at least one student.")
-    if (due && new Date(due) <= new Date()) return setError("The due date must be in the future.")
+  const problem = () =>
+    !learnerIds.length
+      ? "Choose at least one student."
+      : learnerIds.some((id) => !tutorOf(roster, id))
+        ? "Set a tutor for every chosen student under Users before assigning work."
+        : due && new Date(due) <= new Date()
+          ? "The due date must be in the future."
+          : null
+
+  // Same checks as assigning, so the preview only opens for work that can be assigned.
+  const openPreview = () => {
+    if (!formRef.current?.reportValidity()) return
+    const issue = problem()
+    setError(issue)
+    if (!issue) setPreviewing(true)
+  }
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault()
+    setPreviewing(false)
+    const issue = problem()
+    if (issue) return setError(issue)
     setSaving(true)
     setError(null)
     try {
       const { created, skipped } = await assignTask({
         task_id: taskId,
-        // Each student's own tutor owns the work; an admin owns it when there's none.
+        // Each student's own tutor owns the work (every assignable student has one).
         learners: learnerIds.map((id) => ({ learner_id: id, tutor_id: tutorOf(roster, id) ?? currentUserId })),
         due_at: due ? new Date(due).toISOString() : null,
       })
@@ -476,42 +521,52 @@ function AssignForm({
   }
 
   return (
-    <form onSubmit={submit} className="rounded-3xl bg-white p-6 shadow-sm">
+    <form ref={formRef} onSubmit={submit} className="rounded-3xl bg-white p-6 shadow-sm">
       <h2 className="font-extrabold">Create assignment</h2>
       <p className="mt-1 text-xs text-slate-500">Students get a notification. After the due date, work with no recording is marked Missing (0).</p>
       {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{error}</p>}
       <div className="mt-4 space-y-3">
         <select required value={taskId} onChange={(e) => setTaskId(e.target.value)} className={input}>
           <option value="">Task…</option>
-          {tasks.map((t) => (
+          {sortedTasks.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.title} ({t.kind})
+              {t.title} ({t.kind}){t.exam_style ? ` · ${examStyleLabels[t.exam_style] ?? t.exam_style}` : ""}
             </option>
           ))}
         </select>
+        {mismatched.length > 0 && taskExam && (
+          <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+            This is a {EXAMS[taskExam].shortName}-style task, but {mismatched.map((g) => nameOf(g.learner_id)).join(", ")}{" "}
+            {mismatched.length === 1 ? "is" : "are"} preparing for another exam. Pre- and post-tests are easiest to compare on the learner's own exam.
+          </p>
+        )}
         <label className="block text-xs text-slate-500">
           Due date and time (optional)
           <input type="datetime-local" value={due} min={nowLocalInput()} onChange={(e) => setDue(e.target.value)} className={`${input} mt-1`} />
         </label>
         <fieldset>
           <legend className="text-xs text-slate-500">Students</legend>
-          {learners.length > 1 && (
+          {assignable.length > 1 && (
             <button
               type="button"
-              onClick={() => setLearnerIds(learnerIds.length === learners.length ? [] : learners.map((l) => l.id))}
+              onClick={() => setLearnerIds(learnerIds.length === assignable.length ? [] : assignable.map((l) => l.id))}
               className="mt-1 text-xs font-bold text-kez-blue"
             >
-              {learnerIds.length === learners.length ? "Clear all" : "Select all"}
+              {learnerIds.length === assignable.length ? "Clear all" : "Select all"}
             </button>
           )}
           <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
             {learners.map((l) => {
               const tutor = tutorOf(roster, l.id)
               return (
-                <label key={l.id} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm">
-                  <input type="checkbox" checked={learnerIds.includes(l.id)} onChange={() => toggle(l.id)} />
+                <label key={l.id} className={`flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm ${tutor ? "" : "opacity-60"}`}>
+                  <input type="checkbox" disabled={!tutor} checked={learnerIds.includes(l.id)} onChange={() => toggle(l.id)} />
                   <span className="flex-1 truncate">{l.full_name}</span>
-                  {isAdmin && <span className="shrink-0 text-[11px] text-slate-500">{tutor ? `Tutor: ${nameOf(tutor)}` : "No tutor"}</span>}
+                  {tutor ? (
+                    isAdmin && <span className="shrink-0 text-[11px] text-slate-500">Tutor: {nameOf(tutor)}</span>
+                  ) : (
+                    <span className="shrink-0 text-[11px] font-bold text-amber-800">No tutor yet: set one under Users</span>
+                  )}
                 </label>
               )
             })}
@@ -524,14 +579,36 @@ function AssignForm({
         </fieldset>
         {!tasks.length && <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">No speaking tasks yet. Create one under Tasks.</p>}
       </div>
-      <div className="mt-5 flex gap-2">
+      <div className="mt-5 flex flex-wrap gap-2">
         <button type="submit" disabled={saving} className="rounded-xl bg-kez-blue px-5 py-3 text-sm font-bold text-white disabled:opacity-60">
           {saving ? "Assigning…" : "Assign"}
+        </button>
+        <button type="button" onClick={openPreview} className="inline-flex items-center gap-2 rounded-xl bg-kez-blue-light px-5 py-3 text-sm font-bold text-kez-blue">
+          <Eye size={16} aria-hidden="true" /> Preview
         </button>
         <button type="button" onClick={onCancel} className="rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-600">
           Cancel
         </button>
       </div>
+      {previewing && selectedTask && (
+        <TaskPreview
+          task={selectedTask}
+          dueAt={due ? new Date(due).toISOString() : null}
+          note={
+            <>
+              <b className="text-kez-dark">
+                Assigning to {learnerIds.length} student{learnerIds.length === 1 ? "" : "s"}:
+              </b>{" "}
+              {learnerIds.map(nameOf).join(", ")}. They get a notification.
+              {due ? " Work with no recording after the due date is marked Missing (0)." : ""}
+            </>
+          }
+          confirmLabel={`Assign to ${learnerIds.length} student${learnerIds.length === 1 ? "" : "s"}`}
+          busy={saving}
+          onConfirm={() => void submit()}
+          onClose={() => setPreviewing(false)}
+        />
+      )}
     </form>
   )
 }

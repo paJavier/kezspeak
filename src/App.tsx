@@ -41,6 +41,9 @@ import TutorDashboard from "./components/tutor/TutorDashboard"
 import Classwork from "./components/tutor/Classwork"
 import Statistics from "./components/tutor/Statistics"
 import MyAssignments from "./components/student/MyAssignments"
+import AwaitingTutor from "./components/student/AwaitingTutor"
+import ExamGoalCard from "./components/ExamGoalCard"
+import { fetchMyTutorId } from "./lib/classroom"
 import useSubmissionList from "./hooks/useSubmissionList"
 import usePeople from "./hooks/usePeople"
 import useMyAssignments from "./hooks/useMyAssignments"
@@ -1316,10 +1319,24 @@ function StudentApp({ onExit }: { onExit: () => void }) {
   // Refresh when switching pages so new recordings and feedback show up.
   useEffect(reload, [page, reload])
   useEffect(reloadAssignments, [page, reloadAssignments])
+  // Work unlocks once a super admin sets the student's tutor. null = still checking.
+  const [hasTutor, setHasTutor] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!profile?.id) return
+    let cancelled = false
+    fetchMyTutorId(profile.id)
+      .then((tutorId) => !cancelled && setHasTutor(Boolean(tutorId)))
+      // If the check fails, don't lock the UI; the database still enforces the rule.
+      .catch(() => !cancelled && setHasTutor(true))
+    return () => {
+      cancelled = true
+    }
+  }, [page, profile?.id])
+  const awaitingTutor = hasTutor === false
 
   const startTask = (id: string | null) => {
     setTaskId(id)
-    setPage("activity")
+    setPage(awaitingTutor ? "activities" : "activity")
   }
   const navigate = (next: string, relatedId?: string | null) => {
     setSelectedAnnouncementId(next === "announcements" ? relatedId ?? null : null)
@@ -1336,8 +1353,6 @@ function StudentApp({ onExit }: { onExit: () => void }) {
   }
   return (
     <DashboardLayout
-      brand={<Brand dark />}
-      workspaceLabel="My space"
       eyebrow="KezSpeak Student"
       title={titles[page]}
       nav={studentNav}
@@ -1351,13 +1366,21 @@ function StudentApp({ onExit }: { onExit: () => void }) {
       notificationRole="student"
     >
       <div className="mx-auto max-w-[1240px] p-4 sm:p-6 lg:p-10">
+        {awaitingTutor && ["dashboard", "assessment", "activities", "activity"].includes(page) && (
+          <AwaitingTutor onNavigate={navigate} />
+        )}
         {page === "dashboard" && (
           <StudentDashboard submissions={submissions} error={error} onNavigate={navigate} onStartTask={startTask} />
         )}
-        {page === "assessment" && (
+        {page === "dashboard" && profile && (
+          <div className="mt-6">
+            <ExamGoalCard learnerId={profile.id} compact />
+          </div>
+        )}
+        {page === "assessment" && !awaitingTutor && (
           <AssessmentPath submissions={submissions} error={error} onNavigate={navigate} onStartTask={startTask} />
         )}
-        {page === "activities" && (
+        {page === "activities" && !awaitingTutor && (
           <>
             <MyAssignments
               assignments={myAssignments.assignments}
@@ -1368,10 +1391,10 @@ function StudentApp({ onExit }: { onExit: () => void }) {
             <TaskCatalog onStart={startTask} openTaskIds={myAssignments.openTaskIds} />
           </>
         )}
-        {page === "activity" && profile && !myAssignments.assignments && !myAssignments.error && (
+        {page === "activity" && profile && !awaitingTutor && !myAssignments.assignments && !myAssignments.error && (
           <p className="text-center text-slate-500">Loading speaking tasks…</p>
         )}
-        {page === "activity" && profile && (myAssignments.assignments || myAssignments.error) && (
+        {page === "activity" && profile && !awaitingTutor && (myAssignments.assignments || myAssignments.error) && (
           <RecordActivity
             key={taskId ?? "default"}
             learnerId={profile.id}
@@ -1449,8 +1472,6 @@ function TutorApp({ onExit }: { onExit: () => void }) {
   }
   return (
     <DashboardLayout
-      brand={<Brand dark />}
-      workspaceLabel={isSuperAdmin ? "Administrator workspace" : isAdmin ? "Staff workspace" : "Tutor workspace"}
       eyebrow="KezSpeak Tutor"
       title={titles[page]}
       nav={nav}
@@ -1458,13 +1479,13 @@ function TutorApp({ onExit }: { onExit: () => void }) {
       onNavigate={navigate}
       badges={pendingCount ? { review: String(pendingCount) } : undefined}
       userName={profile?.full_name ?? "Tutor"}
-      userSubtitle={isSuperAdmin ? "Administrator" : isAdmin ? "Staff" : "Tutor & Assessor"}
+      userSubtitle={isSuperAdmin ? "Administrator" : isAdmin ? "Moderator" : "Tutor & Assessor"}
       avatarLetter={avatarLetter}
       onSignOut={signOut}
       notificationUserId={profile?.id ?? ""}
       notificationRole={(profile?.role ?? "tutor") as NotificationRole}
     >
-      <div className="mx-auto max-w-[1280px] p-4 sm:p-6 lg:p-10">
+      <div className={`mx-auto ${page === "review" ? "max-w-[1680px]" : "max-w-[1280px]"} p-4 sm:p-6 lg:p-10`}>
         {page === "dashboard" && (
           <TutorDashboard
             submissions={submissions}

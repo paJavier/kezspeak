@@ -191,3 +191,172 @@ def test_comparison_waits_for_model_result(comparing, monkeypatch):
     monkeypatch.setattr(db, "get_submission", lambda sid: {**COMPLETED, "status": "evaluating"})
     as_user("admin-1", "admin")
     assert comparing.post("/submissions/sub-1/ai-comparison").status_code == 409
+
+
+# --- /activities/generate (draft a speaking task from reference material) ---
+
+DRAFT = {"provider": "gemini", "model": "m", "title": "My city", "prompt": "Describe your city.",
+         "follow_up_questions": ["What do you like?"], "skill_focus": "describing places", "duration_seconds": 90}
+
+
+def docx_bytes(*paragraphs):
+    import io
+    import zipfile
+
+    ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    body = "".join(f"<w:p><w:r><w:t>{p}</w:t></w:r></w:p>" for p in paragraphs)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("word/document.xml", f'<w:document xmlns:w="{ns}"><w:body>{body}</w:body></w:document>')
+    return buffer.getvalue()
+
+
+@pytest.fixture
+def drafting(monkeypatch, client):
+    from app import gemini
+
+    calls = []
+
+    def fake_generate(document, skill_focus, exam_style=None):
+        calls.append((document, skill_focus))
+        return DRAFT
+
+    monkeypatch.setattr(gemini, "generate_activity", fake_generate)
+    client.state["draft_calls"] = calls
+    return client
+
+
+def upload(client, name, data, **form):
+    return client.post("/activities/generate", files={"file": (name, data)}, data=form)
+
+
+def test_learner_cannot_generate_activity(drafting):
+    as_user(LEARNER, "student")
+    assert upload(drafting, "notes.txt", b"hello").status_code == 403
+    assert drafting.state["draft_calls"] == []
+
+
+def test_tutor_gets_draft_from_txt(drafting):
+    as_user(TUTOR, "tutor")
+    response = upload(drafting, "notes.txt", b"Cities change over time.", skill_focus="fluency")
+    assert response.status_code == 200
+    assert response.json()["title"] == "My city"
+    document, focus = drafting.state["draft_calls"][0]
+    assert document == {"text": "Cities change over time."}
+    assert focus == "fluency"
+
+
+def test_docx_text_is_extracted(drafting):
+    as_user("admin-1", "admin")
+    assert upload(drafting, "lesson.docx", docx_bytes("First idea", "Second idea")).status_code == 200
+    assert drafting.state["draft_calls"][0][0] == {"text": "First idea\nSecond idea"}
+
+
+def test_pdf_is_sent_inline(drafting):
+    as_user(TUTOR, "tutor")
+    assert upload(drafting, "reading.pdf", b"%PDF-1.4 fake").status_code == 200
+    assert drafting.state["draft_calls"][0][0]["inline_data"]["mime_type"] == "application/pdf"
+
+
+@pytest.mark.parametrize(
+    "name,data",
+    [("run.exe", b"MZ"), ("notes.txt", b""), ("fake.pdf", b"not a pdf"), ("broken.docx", b"nope")],
+)
+def test_bad_reference_files_are_rejected(drafting, name, data):
+    as_user(TUTOR, "tutor")
+    assert upload(drafting, name, data).status_code == 422
+    assert drafting.state["draft_calls"] == []
+
+
+def test_oversized_reference_is_rejected(drafting):
+    from app import reference
+
+    as_user(TUTOR, "tutor")
+    assert upload(drafting, "big.txt", b"a" * (reference.MAX_REFERENCE_BYTES + 1)).status_code == 422
+
+
+def test_gemini_failure_is_502(drafting, monkeypatch):
+    from app import gemini
+
+    def boom(document, skill_focus, exam_style=None):
+        raise gemini.GeminiError("down")
+
+    monkeypatch.setattr(gemini, "generate_activity", boom)
+    as_user(TUTOR, "tutor")
+    assert upload(drafting, "notes.txt", b"text").status_code == 502
+
+
+def test_missing_gemini_key_is_503(drafting, monkeypatch):
+    from app import gemini
+
+    def unset(document, skill_focus, exam_style=None):
+        raise gemini.GeminiNotConfigured("unset")
+
+    monkeypatch.setattr(gemini, "generate_activity", unset)
+    as_user(TUTOR, "tutor")
+    assert upload(drafting, "notes.txt", b"text").status_code == 503
+
+
+def test_generated_draft_is_clamped_and_trimmed(monkeypatch):
+    from app import gemini
+
+    answer = {"title": " Travel ", "prompt": "Talk about a trip.", "follow_up_questions": ["a", " ", "b", "c", "d", "e"],
+              "skill_focus": "narrating", "duration_seconds": 999}
+    monkeypatch.setattr(gemini, "_generate", lambda parts, schema, temperature: ("m", answer))
+    draft = gemini.generate_activity({"text": "x"})
+    assert draft["title"] == "Travel"
+    assert draft["duration_seconds"] == 300
+    assert draft["follow_up_questions"] == ["a", "b", "c"]
+
+
+def test_activity_prompt_keeps_one_topic(monkeypatch):
+    from app import gemini
+
+    sent = {}
+
+    def fake_generate(parts, schema, temperature):
+        sent["parts"] = parts
+        return "m", {"title": "T", "prompt": "P", "follow_up_questions": [], "skill_focus": "", "duration_seconds": 60}
+
+    monkeypatch.setattr(gemini, "_generate", fake_generate)
+    gemini.generate_activity({"text": "material"}, "giving opinions")
+    instructions = sent["parts"][0]["text"]
+    assert "Choose ONE coherent topic" in instructions
+    assert "do not copy its questions" in instructions
+    assert '"giving opinions"' in instructions
+    assert sent["parts"][-1] == {"text": "material"}
+
+
+def test_exam_style_is_passed_to_gemini(drafting, monkeypatch):
+    from app import gemini
+
+    styles = []
+
+    def fake_generate(document, skill_focus, exam_style=None):
+        styles.append(exam_style)
+        return DRAFT
+
+    monkeypatch.setattr(gemini, "generate_activity", fake_generate)
+    as_user(TUTOR, "tutor")
+    assert upload(drafting, "notes.txt", b"text", exam_style="ielts_part2").status_code == 200
+    assert styles == ["ielts_part2"]
+
+
+def test_unknown_exam_style_is_rejected(drafting):
+    as_user(TUTOR, "tutor")
+    assert upload(drafting, "notes.txt", b"text", exam_style="made_up").status_code == 422
+    assert drafting.state["draft_calls"] == []
+
+
+def test_exam_style_hint_reaches_the_prompt(monkeypatch):
+    from app import gemini
+
+    sent = {}
+
+    def fake_generate(parts, schema, temperature):
+        sent["parts"] = parts
+        return "m", {"title": "T", "prompt": "P", "follow_up_questions": [], "skill_focus": "", "duration_seconds": 120}
+
+    monkeypatch.setattr(gemini, "_generate", fake_generate)
+    gemini.generate_activity({"text": "material"}, None, "ielts_part2")
+    assert "IELTS Speaking Part 2 cue card" in sent["parts"][0]["text"]

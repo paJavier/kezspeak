@@ -6,11 +6,11 @@ Run from ml-service/:  .venv\\Scripts\\uvicorn app.main:app --port 8000
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from postgrest.exceptions import APIError
 
-from app import admin, db, gemini
+from app import admin, db, gemini, reference
 from app.auth import CurrentUser, get_current_user, require_api_key
 from app.config import settings
 from app.pipeline import audio, model, nlp, run, stt
@@ -157,6 +157,37 @@ def ai_comparison(submission_id: str, user: CurrentUser = Depends(get_current_us
             "requested_by": user.id,
         }
     )
+
+
+@app.post("/activities/generate")
+def generate_activity(
+    file: UploadFile = File(...),
+    skill_focus: str | None = Form(default=None, max_length=80),
+    exam_style: str | None = Form(default=None, max_length=40),
+    user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Tutor/admin aid: draft a speaking task from reference material.
+
+    The file is read in memory and not stored. The draft goes back to the
+    tutor, who edits it before saving a task through the normal form.
+    """
+    if not user.is_staff:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only tutors and admins can generate activities.")
+    # Read one byte past the limit so oversized uploads are rejected early.
+    raw = file.file.read(reference.MAX_REFERENCE_BYTES + 1)
+    try:
+        document = reference.to_gemini_part(file.filename or "", raw)
+    except reference.ReferenceFileError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
+    if exam_style and exam_style not in gemini.EXAM_STYLE_HINTS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unknown exam style.")
+    try:
+        return gemini.generate_activity(document, (skill_focus or "").strip() or None, exam_style or None)
+    except gemini.GeminiNotConfigured:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "AI activity generation is not configured on the server.")
+    except gemini.GeminiError as exc:
+        log.warning("Gemini activity generation failed: %s", exc)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Gemini is unavailable right now. Try again later.")
 
 
 @app.post("/submissions/{submission_id}/retry", status_code=status.HTTP_202_ACCEPTED)

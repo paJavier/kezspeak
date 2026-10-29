@@ -39,6 +39,16 @@ export async function listRoster(): Promise<RosterLink[]> {
   return data ?? []
 }
 
+/**
+ * The signed-in student's tutor, or null when none is set yet. Students only
+ * get tasks and classwork once they have one (migration 20261103_require_tutor.sql).
+ */
+export async function fetchMyTutorId(learnerId: string): Promise<string | null> {
+  const { data, error } = await supabase.from("tutor_learners").select("tutor_id").eq("learner_id", learnerId).limit(1)
+  if (error) throw new Error(`Could not check your tutor: ${error.message}`)
+  return data?.[0]?.tutor_id ?? null
+}
+
 /** A student's tutor (one per student; the roster table allows more, the UI doesn't). */
 export const tutorOf = (roster: RosterLink[], learnerId: string) => roster.find((r) => r.learner_id === learnerId)?.tutor_id ?? null
 

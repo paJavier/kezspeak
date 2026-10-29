@@ -24,6 +24,26 @@ function Recorder({
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const recording = recorder.state === "recording" || recorder.state === "paused"
+  // Exam-style preparation time (e.g. 60 s for an IELTS Part 2 cue card). null = not preparing.
+  const prepSeconds = task.prep_seconds ?? 0
+  const [prepLeft, setPrepLeft] = useState<number | null>(null)
+  const { start } = recorder
+
+  useEffect(() => {
+    if (prepLeft === null) return
+    if (prepLeft <= 0) {
+      setPrepLeft(null)
+      void start()
+      return
+    }
+    const timer = window.setTimeout(() => setPrepLeft((s) => (s === null ? null : s - 1)), 1000)
+    return () => window.clearTimeout(timer)
+  }, [prepLeft, start])
+
+  const startNow = () => {
+    setPrepLeft(null)
+    void start()
+  }
 
   const submit = async () => {
     if (!recorder.blob) return
@@ -47,7 +67,7 @@ function Recorder({
   return (
     <div className="mt-8 rounded-[32px] bg-white p-8 shadow-sm">
       <span className="rounded-full bg-kez-yellow-light px-4 py-2 text-sm font-bold text-amber-800">
-        Up to {task.duration_seconds} seconds
+        {prepSeconds > 0 ? `${prepSeconds}s to prepare · ` : ""}Up to {task.duration_seconds} seconds
       </span>
       <div
         className={`mx-auto mt-8 grid size-40 place-items-center rounded-full ${recorder.state === "recording"
@@ -103,6 +123,21 @@ function Recorder({
             </button>
           </div>
         </>
+      ) : prepLeft !== null ? (
+        <div className="mt-6" role="timer" aria-live="polite">
+          <p className="text-xs font-bold tracking-wider text-amber-800">PREPARATION TIME</p>
+          <p className="mt-1 text-4xl font-extrabold">{clock(prepLeft)}</p>
+          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+            Read the task above and plan what you'll say. Recording starts automatically when the time is up.
+          </p>
+          <button onClick={startNow} className="mt-5 rounded-xl bg-kez-blue px-6 py-3 text-sm font-bold text-white">
+            🎤 Start recording now
+          </button>
+        </div>
+      ) : prepSeconds > 0 ? (
+        <button onClick={() => setPrepLeft(prepSeconds)} className="mt-7 rounded-xl bg-kez-blue px-6 py-4 text-sm font-bold text-white">
+          ⏱ Start {prepSeconds}s preparation
+        </button>
       ) : (
         <button onClick={recorder.start} className="mt-7 rounded-xl bg-kez-blue px-6 py-4 text-sm font-bold text-white">
           🎤 Start Recording
@@ -179,7 +214,7 @@ export default function RecordActivity({
       {task && (
         <>
           <h2 className="text-xl font-extrabold">{task.title}</h2>
-          <p className="mt-3 text-lg leading-8 text-slate-600">{task.prompt}</p>
+          <p className="mt-3 whitespace-pre-line text-lg leading-8 text-slate-600">{task.prompt}</p>
         </>
       )}
 

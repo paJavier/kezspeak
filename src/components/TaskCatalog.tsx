@@ -59,7 +59,7 @@ export default function TaskCatalog({
             <article key={task.id} className="flex flex-col rounded-3xl bg-white p-5 shadow-sm">
               <span className="grid size-12 place-items-center rounded-2xl bg-kez-blue-light text-2xl">{icons[task.kind]}</span>
               <h2 className="mt-5 font-extrabold">{task.title}</h2>
-              <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">{task.prompt}</p>
+              <p className="mt-2 line-clamp-3 whitespace-pre-line text-xs leading-5 text-slate-500">{task.prompt}</p>
               <p className="mt-4 text-xs leading-6 text-slate-500">
                 Type <b className="float-right text-slate-700">{kindLabels[task.kind]}</b>
                 <br />

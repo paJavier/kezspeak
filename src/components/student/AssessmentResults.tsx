@@ -9,6 +9,7 @@ import {
 } from "../../lib/assessments"
 import AudioPlayer from "../AudioPlayer"
 import EvaluationSummary from "../EvaluationSummary"
+import ExamProgress from "../ExamProgress"
 import ProcessingStatus from "../ProcessingStatus"
 
 const kindLabels = { pre: "Pre-Assessment", post: "Post-Assessment", practice: "Practice" }
@@ -132,6 +133,7 @@ export default function AssessmentResults({
 
   return (
     <div className="space-y-6">
+      <ExamProgress submissions={submissions} learnerId={learnerId} learnerName={submissions[0]?.learner_name ?? "Learner"} />
       <Comparison submissions={submissions} />
       <div className="grid gap-6 xl:grid-cols-[.7fr_1.3fr]">
         <section className="rounded-3xl bg-white p-5 shadow-sm">

@@ -360,6 +360,7 @@ More fixes are in [SETUP.md §10](SETUP.md#10-troubleshooting).
 ## More documentation
 
 - [SETUP.md](SETUP.md): longer setup guide, Supabase dashboard settings (URLs, SMTP, email templates), troubleshooting
+- [DEPLOYMENT.md](DEPLOYMENT.md): go-live checklist for Vercel (web app), Render (ml-service) and Supabase
 - [ml-service/README.md](ml-service/README.md): ML pipeline, API endpoints, model files, differences from the Colab notebook
 - [.claude/agents/kezspeak.md](.claude/agents/kezspeak.md): research context, data model and target architecture
 

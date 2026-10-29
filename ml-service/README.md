@@ -67,6 +67,7 @@ The frontend reads `VITE_ML_API_URL` (default `http://localhost:8000`). Add the 
 | POST | `/submissions/{id}/process` | user's Supabase session (`Authorization: Bearer`) | Start analysis of an uploaded submission; returns 202, then status updates go to the `submissions` row |
 | POST | `/submissions/{id}/retry` | same | Re-run a `failed` submission without re-recording |
 | POST | `/evaluate` | `access_token: <KEZSPEAK_API_KEY>` | **Server-to-server only.** Multipart `file` field; returns the result directly and stores nothing |
+| POST | `/activities/generate` | user's Supabase session (tutor/admin) | Multipart `file` (PDF, DOCX or TXT, ≤ 10 MB) plus optional `skill_focus`; Gemini drafts a speaking task (title, prompt, follow-up questions, skill focus, duration). The file and draft are not stored. Needs `GEMINI_API_KEY` (503 when unset) |
 
 `KEZSPEAK_API_KEY` must never be put in the frontend, because anything prefixed `VITE_` is shipped to every browser. The Supabase Edge Function route `/make-server-8450f8e5/evaluate` holds the key and only accepts tutors and admins. Give the Edge Function these secrets:
 

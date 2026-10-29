@@ -1,3 +1,4 @@
+import type { ExamStyle, Rubric } from "./exams"
 import { supabase } from "./supabase"
 
 const ML_API_URL = (import.meta.env.VITE_ML_API_URL || "http://localhost:8000").replace(/\/+$/, "")
@@ -23,6 +24,10 @@ export type AssessmentTask = {
   duration_seconds: number
   /** Who created it; tutors may only change their own practice tasks (RLS). */
   created_by?: string | null
+  /** Exam-style template this task follows (lib/exams.ts), if any. */
+  exam_style?: ExamStyle | null
+  /** Preparation countdown before recording, e.g. 60 s for an IELTS Part 2 cue card. */
+  prep_seconds?: number
 }
 
 export type AcousticFeatures = Record<string, number> & {
@@ -64,6 +69,8 @@ export type TutorFeedback = {
   strengths: string | null
   improvements: string | null
   adjusted_score: number | null
+  /** Tutor's exam-style rubric (practice estimate). Never feeds the machine score or pre/post. */
+  rubric?: Rubric | null
   updated_at: string
 }
 
@@ -162,7 +169,8 @@ async function selectSubmissions<T>(
 export async function listTasks(): Promise<AssessmentTask[]> {
   const { data, error } = await supabase
     .from("assessment_tasks")
-    .select("id, title, prompt, skill_focus, kind, duration_seconds, created_by")
+    // "*" so exam_style / prep_seconds load once 20261104_exam_goals.sql is applied, without breaking before.
+    .select("*")
     .order("created_at")
   if (error) throw new Error(`Could not load speaking tasks: ${error.message}`)
   return data ?? []
@@ -251,11 +259,13 @@ export async function callMlService<T = unknown>(
   try {
     response = await fetch(`${ML_API_URL}${path}`, {
       method: options.method ?? "POST",
+      // FormData sets its own multipart Content-Type (with the boundary).
       headers: {
         Authorization: `Bearer ${token}`,
-        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(options.body !== undefined && !(options.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
       },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body:
+        options.body instanceof FormData ? options.body : options.body !== undefined ? JSON.stringify(options.body) : undefined,
     })
   } catch {
     throw new Error(
@@ -344,6 +354,8 @@ export async function saveFeedback(params: {
   strengths: string
   improvements: string
   adjustedScore: number | null
+  /** Omit to leave the stored rubric unchanged. */
+  rubric?: Rubric | null
 }): Promise<void> {
   const { error } = await supabase.from("tutor_feedback").upsert(
     {
@@ -353,10 +365,14 @@ export async function saveFeedback(params: {
       strengths: params.strengths || null,
       improvements: params.improvements || null,
       adjusted_score: params.adjustedScore,
+      ...(params.rubric !== undefined ? { rubric: params.rubric } : {}),
     },
     { onConflict: "submission_id" },
   )
-  if (error) throw new Error(`Could not save feedback: ${error.message}`)
+  if (error) {
+    if (/rubric/.test(error.message)) throw new Error("Exam scoring isn't set up yet: apply supabase/migrations/20261104_exam_goals.sql.")
+    throw new Error(`Could not save feedback: ${error.message}`)
+  }
 }
 
 /** The tutor-adjusted score wins over the machine estimate when present. */

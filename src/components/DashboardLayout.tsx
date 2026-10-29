@@ -9,8 +9,6 @@ export type NavIcon = string | ComponentType<{ size?: number; className?: string
 export type NavItem = [id: string, icon: NavIcon, label: string]
 
 type Props = {
-  brand: ReactNode
-  workspaceLabel: string
   eyebrow: string
   title: string
   nav: NavItem[]
@@ -31,7 +29,7 @@ type Props = {
  * large screens and a slide-in drawer (opened from the header) below `lg`.
  */
 export default function DashboardLayout(props: Props) {
-  const { brand, workspaceLabel, eyebrow, title, nav, isActive, onNavigate, badges, userName, userSubtitle, avatarLetter, onSignOut, notificationUserId, notificationRole, children } = props
+  const { eyebrow, title, nav, isActive, onNavigate, badges, userName, userSubtitle, avatarLetter, onSignOut, notificationUserId, notificationRole, children } = props
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -55,15 +53,25 @@ export default function DashboardLayout(props: Props) {
 
   const sidebar = (
     <>
-      <div className="flex items-center justify-between px-3">
-        {brand}
-        <button onClick={() => setMenuOpen(false)} className="grid size-9 place-items-center rounded-full text-white/70 hover:bg-white/10 lg:hidden" aria-label="Close menu">
+      <div className="relative flex items-center justify-center px-1">
+        {/* The logo is the way home: it opens the dashboard from any page. */}
+        <button
+          type="button"
+          onClick={() => navigate("dashboard")}
+          aria-label="Go to dashboard"
+          className="rounded-3xl p-1 transition hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kez-yellow"
+        >
+          {/* logo-mark.png is logo.png with its transparent margins cropped off. */}
+          <img src="/images/logo-mark.png" alt="KezSpeak" className="h-28 w-auto object-contain [@media(min-height:860px)]:h-36" />
+        </button>
+        {/* Absolute so the close button doesn't push the logo off-center. */}
+        <button onClick={() => setMenuOpen(false)} className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-white/70 hover:bg-white/10 lg:hidden" aria-label="Close menu">
           ✕
         </button>
       </div>
-      <p className="mt-8 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-white/35">{workspaceLabel}</p>
       {/* min-h-0 lets the nav scroll instead of pushing the footer off-screen. */}
-      <nav className="mt-3 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+      {/* Thin, dark scrollbar so short windows don't show a bright white bar. */}
+      <nav className="mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 [scrollbar-color:rgb(255_255_255/0.2)_transparent] [scrollbar-width:thin]">
         {nav.map(([id, Icon, label]) => (
           <button
             key={id}

@@ -21,7 +21,7 @@ Role = Literal["student", "tutor", "admin", "super_admin"]
 PROFILE_FIELDS = "id, full_name, email, role, created_at"
 
 # Display names (match src/lib/admin.ts). The role values themselves don't change.
-ROLE_LABELS = {"student": "Learner", "tutor": "Tutor / Teacher", "admin": "Staff", "super_admin": "Administrator"}
+ROLE_LABELS = {"student": "Learner", "tutor": "Tutor / Teacher", "admin": "Moderator", "super_admin": "Administrator"}
 ROLE_INTROS = {
     "student": (
         "Kez Tutorial Service has created a KezSpeak learner account for you. KezSpeak is where you will "

@@ -1,5 +1,12 @@
 {
+  "title": "KezSpeak Learning",
   "description": "Enhance English speaking skills with assessments, practice activities, and tutor feedback, tracking progress for students and educators.",
+  "icons": {
+    "icon": "/images/logo-mark.png"
+  },
+  "openGraph": {
+    "image": "/images/logo.png"
+  },
   "robots": {
     "index": false
   },

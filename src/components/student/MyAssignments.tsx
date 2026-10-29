@@ -50,7 +50,7 @@ export default function MyAssignments({
               <article key={a.id} className="flex flex-col rounded-3xl bg-white p-5 shadow-sm">
                 <span className={`w-fit rounded-full px-2.5 py-0.5 text-[11px] font-bold ${stateStyles[state]}`}>{stateLabels[state]}</span>
                 <h3 className="mt-3 font-extrabold">{a.task?.title ?? "Speaking task"}</h3>
-                <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">{a.task?.prompt}</p>
+                <p className="mt-2 line-clamp-3 whitespace-pre-line text-xs leading-5 text-slate-500">{a.task?.prompt}</p>
                 <p className="mt-3 text-xs font-bold text-slate-700">Due {formatDue(a.due_at)}</p>
                 <div className="mt-auto pt-5">
                   <button onClick={() => onStart(a.task_id)} className="w-full rounded-xl bg-kez-blue py-3 text-sm font-bold text-white">

@@ -129,6 +129,9 @@ The SQL files are **not on GitHub** (`supabase/migrations/` is git-ignored). If 
 | `20261031c_announcement_policy.sql` | Records the live rule that only admins publish announcements |
 | `20261101_research_guards.sql` | Pre/post only when assigned, task permissions, re-assigning practice |
 | `20261101b_guard_order.sql` | Duplicate-assignment check no longer reveals other students' tasks to unauthorized users |
+| `20261102_announcement_audience.sql` | Announcements: administrators/moderators pick Everyone, All students or All tutors; tutors post to their own students only |
+| `20261103_require_tutor.sql` | Students get tasks, classwork and recordings only after a super admin sets their tutor |
+| `20261104_exam_goals.sql` | Exam goals (IELTS / TOEFL / Cambridge), tutor rubric scores on feedback, exam-style tasks with preparation time |
 
 Make someone an Administrator (SQL editor; the database value is `super_admin`):
 

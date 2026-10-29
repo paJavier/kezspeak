@@ -1,23 +1,16 @@
 import { Check, CheckCheck, Inbox } from "lucide-react"
 import { useEffect, useState } from "react"
-import { formatNotificationTime } from "../../lib/notifications"
+import { formatNotificationTime, matchesNotificationFilter as matchesFilter, notificationFilters, type NotificationFilter } from "../../lib/notifications"
 import { useNotifications } from "./NotificationProvider"
 import AnnouncementsPage from "./AnnouncementsPage"
 import type { NotificationRole } from "../../lib/notifications"
 
-type Filter = "all" | "unread" | "announcements" | "assessments" | "scores" | "submissions" | "requests"
+type Filter = NotificationFilter
 
 type Props = {
   userId: string
   role: NotificationRole
   selectedAnnouncementId?: string | null
-}
-
-const roleFilters: Record<NotificationRole, Filter[]> = {
-  student: ["all", "unread", "announcements", "assessments", "scores"],
-  tutor: ["all", "unread", "announcements", "submissions", "requests"],
-  admin: ["all", "unread", "announcements", "assessments", "scores", "submissions", "requests"],
-  super_admin: ["all", "unread", "announcements", "assessments", "scores", "submissions", "requests"],
 }
 
 const filterLabels: Record<Filter, string> = {
@@ -27,23 +20,12 @@ const filterLabels: Record<Filter, string> = {
   assessments: "Assessments",
   scores: "Scores & Feedback",
   submissions: "Submissions",
-  requests: "Requests",
-}
-
-const matchesFilter = (filter: Filter, type: string) => {
-  if (filter === "all") return true
-  if (filter === "unread") return true
-  if (filter === "announcements") return type === "announcement"
-  if (filter === "assessments") return type === "assessment_available"
-  if (filter === "scores") return type === "score_released" || type === "feedback_published"
-  if (filter === "submissions") return type === "review_required"
-  return type === "access_request" || type === "admin_request"
 }
 
 export default function NotificationsPage({ userId, role, selectedAnnouncementId }: Props) {
   const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead, openNotification } = useNotifications()
   const [filter, setFilter] = useState<Filter>(selectedAnnouncementId ? "announcements" : "all")
-  const filters = roleFilters[role]
+  const filters = notificationFilters(role)
   useEffect(() => {
     if (selectedAnnouncementId) setFilter("announcements")
   }, [selectedAnnouncementId])
@@ -63,7 +45,7 @@ export default function NotificationsPage({ userId, role, selectedAnnouncementId
         </button>
       </div>
 
-      <div className="mb-4 flex gap-2" role="group" aria-label="Filter notifications">
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter notifications">
         {filters.map((value) => (
           <button key={value} type="button" onClick={() => setFilter(value)} aria-pressed={filter === value} className={`rounded-full px-4 py-2 text-sm font-bold ${filter === value ? "bg-kez-blue text-white" : "bg-white text-slate-600"}`}>
             {filterLabels[value]}{value === "unread" && unreadCount !== null ? ` (${unreadCount})` : ""}

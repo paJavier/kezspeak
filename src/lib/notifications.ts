@@ -23,6 +23,45 @@ const roleDestinations: Record<NotificationRole, ReadonlySet<string>> = {
   super_admin: new Set(["review", "submissions", "learners", "announcements", "notifications", "classwork", "users", "tasks", "profile"]),
 }
 
+export type AnnouncementAudience = "everyone" | "students" | "tutors"
+
+/**
+ * Who a role may address. Administrators and moderators pick any audience; a
+ * tutor's announcement only reaches their own students (enforced by RLS and
+ * notify_published_announcement, migration 20261102_announcement_audience.sql).
+ */
+export function audienceOptions(role: NotificationRole): AnnouncementAudience[] {
+  if (role === "admin" || role === "super_admin") return ["everyone", "students", "tutors"]
+  if (role === "tutor") return ["students"]
+  return []
+}
+
+export function audienceLabel(audience: AnnouncementAudience, authorRole: NotificationRole): string {
+  if (authorRole === "tutor") return "My students"
+  return { everyone: "Everyone", students: "All students", tutors: "All tutors & staff" }[audience]
+}
+
+export type NotificationFilter = "all" | "unread" | "announcements" | "assessments" | "scores" | "submissions"
+
+/**
+ * Filters each role can actually use. Staff only ever receive announcements
+ * and submission reviews (see the notify_* triggers); the assessment and
+ * score filters are for students.
+ */
+export function notificationFilters(role: NotificationRole): NotificationFilter[] {
+  return role === "student"
+    ? ["all", "unread", "announcements", "assessments", "scores"]
+    : ["all", "unread", "announcements", "submissions"]
+}
+
+export function matchesNotificationFilter(filter: NotificationFilter, type: string): boolean {
+  if (filter === "all" || filter === "unread") return true
+  if (filter === "announcements") return type === "announcement"
+  if (filter === "assessments") return type === "assessment_available"
+  if (filter === "scores") return type === "score_released" || type === "feedback_published" || type === "assignment_graded"
+  return type === "review_required"
+}
+
 /** Notification rows contain only internal page keys; arbitrary URLs are rejected. */
 export function safeNotificationDestination(role: NotificationRole, destination: string): string {
   return roleDestinations[role].has(destination) ? destination : "notifications"
